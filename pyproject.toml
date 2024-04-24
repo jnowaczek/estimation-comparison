@@ -5,7 +5,10 @@ description = "Run compression estimation algorithms on files"
 authors = [
     {name = "Julian Nowaczek", email = "jnowaczek@users.noreply.github.com"},
 ]
-dependencies = []
+dependencies = [
+    "numpy>=1.26.4",
+    "scipy>=1.12.0",
+]
 requires-python = "==3.12.*"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
