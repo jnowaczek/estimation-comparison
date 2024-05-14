@@ -14,7 +14,7 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import unittest
 
-from estimation_comparison.algorithm.entropy import Entropy
+from estimation_comparison.estimator.entropy import Entropy
 
 
 class BasicEntropyTests(unittest.TestCase):

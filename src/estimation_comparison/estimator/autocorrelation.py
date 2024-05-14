@@ -18,7 +18,7 @@ from typing import Dict
 import numpy as np
 import scipy.signal as signal
 
-from estimation_comparison.algorithm.estimator_base import EstimatorBase
+from estimation_comparison.estimator.estimator_base import EstimatorBase
 
 
 class Autocorrelation(EstimatorBase):

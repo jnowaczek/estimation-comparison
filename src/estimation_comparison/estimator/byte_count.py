@@ -15,7 +15,7 @@
 import array
 from typing import Dict
 
-from estimation_comparison.algorithm.estimator_base import EstimatorBase
+from estimation_comparison.estimator.estimator_base import EstimatorBase
 
 
 class ByteCount(EstimatorBase):
@@ -28,6 +28,7 @@ class ByteCount(EstimatorBase):
     def estimate(self, data: bytes) -> int:
         appearances = array.array("H", [0] * 256)
 
+        # TODO: Utilize block_size parameter, otherwise appearances can overflow
         for byte in data:
             appearances[byte] += 1
 

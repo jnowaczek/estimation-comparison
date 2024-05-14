@@ -12,22 +12,6 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import unittest
-
-from estimation_comparison.estimator.autocorrelation import Autocorrelation
-
-
-class BasicAutocorrelationTests(unittest.TestCase):
-    basic = Autocorrelation({"block_size": 1024})
-
-    def test_zeros(self):
-        result = self.basic.estimate(b"0" * 1024)
-        self.assertEqual(result, 1)
-
-    def test_count(self):
-        result = self.basic.estimate(bytes(range(256)) * 4)
-        self.assertEqual(result, 0)
-
-
-if __name__ == '__main__':
-    unittest.main()
+from .autocorrelation import Autocorrelation
+from .byte_count import ByteCount
+from .entropy import Entropy

@@ -14,7 +14,7 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import unittest
 
-from estimation_comparison.algorithm.byte_count import ByteCount
+from estimation_comparison.estimator.byte_count import ByteCount
 
 
 class BasicByteCountTests(unittest.TestCase):
