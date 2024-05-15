@@ -18,15 +18,47 @@ from estimation_comparison.data_collection.estimator.byte_count import ByteCount
 
 
 class BasicByteCountTests(unittest.TestCase):
-    basic = ByteCount({"block_size": 1024})
+    kilobyte = ByteCount({"block_size": 1024})
+    half_kilobyte = ByteCount({"block_size": 512})
+    quarter_kilobyte = ByteCount({"block_size": 256})
 
-    def test_zeros(self):
-        result = self.basic.estimate(b"0" * 1024)
-        self.assertEqual(result, 1)
+    def test_zeros_kilo(self):
+        result = self.kilobyte.estimate(b"0" * 1024)
+        self.assertEqual(result, [1])
 
-    def test_count(self):
-        result = self.basic.estimate(bytes(range(256)) * 4)
-        self.assertEqual(result, 0)
+    def test_count_kilo(self):
+        data = bytes(range(256)) * 4
+        result = self.kilobyte.estimate(data)
+        self.assertEqual(result, [0])
+
+    def test_zeros_half(self):
+        result = self.half_kilobyte.estimate(b"0" * 1024)
+        self.assertEqual(result, [1, 1])
+
+    def test_count_half(self):
+        result = self.half_kilobyte.estimate(bytes(range(256)) * 4)
+        self.assertEqual(result, [0, 0])
+
+    def test_zeros_quarter(self):
+        result = self.quarter_kilobyte.estimate(b"0" * 1024)
+        self.assertEqual(result, [1, 1, 1, 1])
+
+    def test_count_quarter(self):
+        result = self.quarter_kilobyte.estimate(bytes(range(256)) * 4)
+        self.assertEqual(result, [0, 0, 0, 0])
+
+
+class SingleBlockByteCountTests(unittest.TestCase):
+    single_block = ByteCount({"block_size": None})
+
+    def test_zeros_5k(self):
+        result = self.single_block.estimate(b"0" * 1024 * 5)
+        self.assertEqual(result, [1])
+
+    def test_count_5k(self):
+        data = bytes(range(256)) * 4 * 5
+        result = self.single_block.estimate(data)
+        self.assertEqual(result, [0])
 
 
 if __name__ == '__main__':

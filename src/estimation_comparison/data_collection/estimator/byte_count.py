@@ -13,7 +13,8 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import array
-from typing import Dict
+import itertools
+from typing import Dict, List
 
 from estimation_comparison.data_collection.estimator.estimator_base import EstimatorBase
 
@@ -25,12 +26,21 @@ class ByteCount(EstimatorBase):
                 raise ValueError(f"Missing required parameter: '{parameter}'")
         super().__init__(parameters)
 
-    def estimate(self, data: bytes) -> int:
-        appearances = array.array("H", [0] * 256)
+    def estimate(self, data: bytes) -> List[int]:
+        blocks = [data]
+        results = []
 
-        # TODO: Utilize block_size parameter, otherwise appearances can overflow
-        for byte in data:
-            appearances[byte] += 1
+        if self.parameters["block_size"] is not None:
+            blocks = itertools.batched(data, self.parameters["block_size"])
 
-        threshold = self.parameters["block_size"] / len(appearances)
-        return len(list(filter(lambda x: x > threshold, appearances.tolist())))
+        for block in blocks:
+            appearances = array.array("H", [0] * 256)
+
+            for byte in block:
+                appearances[byte] += 1
+
+            # Use actual block size in case we get a small block at the end
+            threshold = len(block) / len(appearances)
+            results.append(len(list(filter(lambda x: x > threshold, appearances.tolist()))))
+
+        return results

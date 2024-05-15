@@ -41,6 +41,7 @@ class Benchmark:
         self.estimators = {
             "autocorrelation_1k": Autocorrelation({"block_size": 1024}),
             "bytecount_1k": ByteCount({"block_size": 1024}),
+            "bytecount_file": ByteCount({"block_size": None}),
             "entropy_bits": Entropy({"base": 2})
         }
 
