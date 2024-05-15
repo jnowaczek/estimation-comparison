@@ -12,25 +12,29 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import array
+import itertools
 from typing import Dict
 
-from estimation_comparison.estimator.estimator_base import EstimatorBase
+import numpy as np
+import scipy.signal as signal
+
+from estimation_comparison.data_collection.estimator.estimator_base import EstimatorBase
 
 
-class ByteCount(EstimatorBase):
+class Autocorrelation(EstimatorBase):
     def __init__(self, parameters: Dict[str, any]):
         for parameter in ["block_size"]:
             if parameter not in parameters:
                 raise ValueError(f"Missing required parameter: '{parameter}'")
         super().__init__(parameters)
 
-    def estimate(self, data: bytes) -> int:
-        appearances = array.array("H", [0] * 256)
+    def estimate(self, data: bytes) -> any:
+        acf = []
+        for block in itertools.batched(data, self.parameters["block_size"]):
+            mean = np.mean(block)
+            normalized_block = np.subtract(block, mean)
+            numerator = signal.correlate(normalized_block, normalized_block)
+            denominator = np.sum(normalized_block * normalized_block)
+            acf.append(numerator / denominator)
 
-        # TODO: Utilize block_size parameter, otherwise appearances can overflow
-        for byte in data:
-            appearances[byte] += 1
-
-        threshold = self.parameters["block_size"] / len(appearances)
-        return len(list(filter(lambda x: x > threshold, appearances.tolist())))
+        return acf

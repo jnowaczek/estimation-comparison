@@ -14,7 +14,7 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import unittest
 
-from estimation_comparison.estimator.autocorrelation import Autocorrelation
+from estimation_comparison.data_collection.estimator.autocorrelation import Autocorrelation
 
 
 class BasicAutocorrelationTests(unittest.TestCase):
