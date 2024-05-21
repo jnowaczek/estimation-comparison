@@ -34,7 +34,7 @@ class ByteCount(EstimatorBase):
             blocks = itertools.batched(data, self.parameters["block_size"])
 
         for block in blocks:
-            appearances = array.array("H", [0] * 256)
+            appearances = array.array("L", [0] * 256)
 
             for byte in block:
                 appearances[byte] += 1

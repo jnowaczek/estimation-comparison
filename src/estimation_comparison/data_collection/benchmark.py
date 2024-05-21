@@ -28,6 +28,9 @@
 import argparse
 import concurrent.futures
 import logging
+from concurrent.futures import ProcessPoolExecutor
+import functools
+from timeit import default_timer
 from pathlib import Path
 from typing import List, Dict
 
@@ -35,7 +38,7 @@ from estimation_comparison.data_collection.estimator import Autocorrelation, Byt
 
 
 class Benchmark:
-    def __init__(self, workers: int, parallel=False):
+    def __init__(self, workers: int | None, parallel=False):
         self.results: Dict = {}
         self.file_list: List[Path] = []
         self.estimators = {
@@ -49,7 +52,7 @@ class Benchmark:
             self.results[key] = {}
 
         if parallel:
-            self.process_pool = concurrent.futures.ProcessPoolExecutor(max_workers=workers)
+            self.process_pool = ProcessPoolExecutor(max_workers=workers)
         else:
             self.process_pool = None
 
@@ -68,19 +71,42 @@ class Benchmark:
             f" {len(locations)} directory{"s" if len(locations) > 1 else ""}")
 
     def run(self):
+        start_time = default_timer()
+        num_tasks = len(self.file_list) * len(self.estimators.values())
+        completed_tasks = 0
+
+        tasks = []
         for instance_name, instance in self.estimators.items():
             for file in self.file_list:
-                with file.open("rb") as f:
-                    try:
-                        if self.process_pool is not None:
-                            result = self.process_pool.submit(instance.estimate, f.read()).result()
-                            print(result)
-                        else:
-                            result = instance.estimate(f.read())
-                            self.results[instance_name][file] = result
+                try:
+                    data = self._read_cached(file)
+                    if self.process_pool is not None:
+                        future = self.process_pool.submit(instance.estimate, data)
+                        future.context = (instance_name, file)
+                        tasks.append(future)
+                    else:
+                        result = instance.estimate(data)
+                        self.results[instance_name][file] = result
+                        completed_tasks += 1
+                        logging.info(
+                            f"{completed_tasks}/{num_tasks} tasks complete, {completed_tasks / num_tasks * 100:.2f}%")
 
-                    except Exception as e:
-                        logging.exception(f"Input file '{file.name}' raised exception\n\t{e})")
+                except Exception as e:
+                    logging.exception(f"Input file '{file.name}' raised exception\n\t{e})")
+
+        if self.process_pool is not None:
+            for future in concurrent.futures.as_completed(tasks):
+                completed_tasks += 1
+                logging.info(f"{completed_tasks}/{num_tasks} tasks complete, {completed_tasks / num_tasks * 100:.2f}%")
+                self.results[future.context[0]][future.context[1]] = future.result()
+            self.process_pool.shutdown()
+
+        logging.info(f"Benchmark completed in {default_timer() - start_time:.3f} seconds")
+
+    @functools.cache
+    def _read_cached(self, path):
+        with open(path, "rb") as f:
+            return f.read()
 
 
 if __name__ == "__main__":
@@ -88,7 +114,7 @@ if __name__ == "__main__":
     parser.add_argument("dir", action="append")
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true")
     parser.add_argument("-p", "--parallel", dest="parallel", action="store_true")
-    parser.add_argument("-w", "--workers", type=int, dest="workers", default=4)
+    parser.add_argument("-w", "--workers", type=int, dest="workers", default=None)
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
