@@ -28,8 +28,11 @@
 import argparse
 import concurrent.futures
 import logging
+import pickle
+import time
 from concurrent.futures import ProcessPoolExecutor
 import functools
+from datetime import datetime
 from timeit import default_timer
 from pathlib import Path
 from typing import List, Dict
@@ -38,8 +41,9 @@ from estimation_comparison.data_collection.estimator import Autocorrelation, Byt
 
 
 class Benchmark:
-    def __init__(self, workers: int | None, parallel=False):
+    def __init__(self, output_dir: str, workers: int | None, parallel=False):
         self.results: Dict = {}
+        self.output_dir = output_dir
         self.file_list: List[Path] = []
         self.estimators = {
             "autocorrelation_1k": Autocorrelation({"block_size": 1024}),
@@ -103,6 +107,11 @@ class Benchmark:
 
         logging.info(f"Benchmark completed in {default_timer() - start_time:.3f} seconds")
 
+        output_file = f"{self.output_dir}/benchmark_{datetime.now().isoformat()}.pkl"
+        with open(output_file, "wb") as f:
+            pickle.dump(self.results, f)
+        logging.info(f"Results written to '{output_file}'")
+
     @functools.cache
     def _read_cached(self, path):
         with open(path, "rb") as f:
@@ -115,11 +124,12 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true")
     parser.add_argument("-p", "--parallel", dest="parallel", action="store_true")
     parser.add_argument("-w", "--workers", type=int, dest="workers", default=None)
+    parser.add_argument("-o", "--output_dir", type=str, dest="output_dir", default=".")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
 
-    benchmark = Benchmark(workers=args.workers, parallel=args.parallel)
+    benchmark = Benchmark(args.output_dir, workers=args.workers, parallel=args.parallel)
     benchmark.build_file_list(args.dir)
 
     benchmark.run()
