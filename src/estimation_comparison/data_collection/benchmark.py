@@ -29,13 +29,14 @@ import argparse
 import concurrent.futures
 import logging
 import pickle
-import time
 from concurrent.futures import ProcessPoolExecutor
 import functools
 from datetime import datetime
 from timeit import default_timer
 from pathlib import Path
 from typing import List, Dict
+
+from pandas import DataFrame
 
 from estimation_comparison.data_collection.estimator import Autocorrelation, ByteCount, Entropy
 
@@ -90,7 +91,7 @@ class Benchmark:
                         tasks.append(future)
                     else:
                         result = instance.estimate(data)
-                        self.results[instance_name][file] = result
+                        self.results[instance_name][str(file)] = result
                         completed_tasks += 1
                         logging.info(
                             f"{completed_tasks}/{num_tasks} tasks complete, {completed_tasks / num_tasks * 100:.2f}%")
@@ -102,14 +103,16 @@ class Benchmark:
             for future in concurrent.futures.as_completed(tasks):
                 completed_tasks += 1
                 logging.info(f"{completed_tasks}/{num_tasks} tasks complete, {completed_tasks / num_tasks * 100:.2f}%")
-                self.results[future.context[0]][future.context[1]] = future.result()
+                self.results[future.context[0]][str(future.context[1])] = future.result()
             self.process_pool.shutdown()
 
         logging.info(f"Benchmark completed in {default_timer() - start_time:.3f} seconds")
 
-        output_file = f"{self.output_dir}/benchmark_{datetime.now().isoformat()}.pkl"
-        with open(output_file, "wb") as f:
-            pickle.dump(self.results, f)
+        dataframe = DataFrame.from_dict(self.results)
+        print(dataframe.head())
+
+        output_file = f"{self.output_dir}/benchmark_{datetime.now().isoformat()}.feather"
+        dataframe.to_feather(output_file)
         logging.info(f"Results written to '{output_file}'")
 
     @functools.cache
