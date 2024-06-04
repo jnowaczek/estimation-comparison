@@ -18,10 +18,11 @@ import pickle
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
+import hvplot
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from estimation_comparison.analysis.plot import plot_scalar, plot_vector
+from estimation_comparison.analysis.plot import plot_entropy_bits, plot_scalar, plot_bytecount_file
 
 
 class Analyze:
@@ -44,9 +45,19 @@ class Analyze:
                 raise ValueError(f"Unsupported file type: {suffix}")
 
     def run(self):
+        plots = {}
+
         for estimator in self.data.keys():
-            if estimator == "entropy_bits":
-                plot_scalar(self.data["entropy_bits"])
+            match estimator:
+                case "entropy_bits":
+                    plots[estimator] = plot_entropy_bits(self.data[estimator])
+                case "bytecount_file":
+                    plots[estimator] = plot_bytecount_file(self.data[estimator])
+                case _:
+                    logging.error(f"Not plotting unsupported estimator: {estimator}")
+
+        for i, p in enumerate(plots.values()):
+            hvplot.save(p, f"{self.output_dir}/{i}.html")
 
 
 if __name__ == "__main__":

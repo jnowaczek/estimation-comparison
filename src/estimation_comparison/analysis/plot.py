@@ -14,17 +14,29 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import matplotlib.pyplot as plt
+import hvplot.pandas
+from pandas import DataFrame
 
 
-def plot_scalar(results):
-    fig, ax = plt.subplots(dpi=300)
-    ax.tick_params(axis="x", labelrotation=90)
-    for path, value in results.items():
-        ax.bar(str(path), value)
-    fig.subplots_adjust(bottom=.5)
-    fig.show()
+def plot_scalar(df: DataFrame, columns: [str]):
+    # fig, ax = plt.subplots(dpi=300)
+    # ax.tick_params(axis="x", labelrotation=90)
+    # for path, value in results.items():
+    #     ax.bar(str(path), value)
+    # fig.subplots_adjust(bottom=.5)
+    # fig.show()
+    plot = df.hvplot.bar(rot=90) + df.hvplot.table(columns=columns, sortable=True)
+    return plot
 
 
 def plot_vector(results):
     for file in results.keys():
         print(file)
+
+
+def plot_entropy_bits(df):
+    return plot_scalar(df, ["index", "entropy_bits"])
+
+
+def plot_bytecount_file(df):
+    return plot_scalar(df, ["index", "bytecount_file"])

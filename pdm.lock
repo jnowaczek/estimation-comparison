@@ -5,7 +5,104 @@
 groups = ["default"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:2e503c2dc7e2c0437d2e0b6c55aa56826fb26b4d312ea850e2bdddd19cad9795"
+content_hash = "sha256:0eb428ef11cbe4e72ec9e8b51c44569499fa0a06ada3fd1f852a54181c046fc7"
+
+[[package]]
+name = "bleach"
+version = "6.1.0"
+requires_python = ">=3.8"
+summary = "An easy safelist-based HTML-sanitizing tool."
+groups = ["default"]
+dependencies = [
+    "six>=1.9.0",
+    "webencodings",
+]
+files = [
+    {file = "bleach-6.1.0-py3-none-any.whl", hash = "sha256:3225f354cfc436b9789c66c4ee030194bee0568fbf9cbdad3bc8b5c26c5f12b6"},
+    {file = "bleach-6.1.0.tar.gz", hash = "sha256:0a31f1837963c41d46bbf1331b8778e1308ea0791db03cc4e7357b97cf42a8fe"},
+]
+
+[[package]]
+name = "bokeh"
+version = "3.4.1"
+requires_python = ">=3.9"
+summary = "Interactive plots and applications in the browser from Python"
+groups = ["default"]
+dependencies = [
+    "Jinja2>=2.9",
+    "PyYAML>=3.10",
+    "contourpy>=1.2",
+    "numpy>=1.16",
+    "packaging>=16.8",
+    "pandas>=1.2",
+    "pillow>=7.1.0",
+    "tornado>=6.2",
+    "xyzservices>=2021.09.1",
+]
+files = [
+    {file = "bokeh-3.4.1-py3-none-any.whl", hash = "sha256:1e3c502a0a8205338fc74dadbfa321f8a0965441b39501e36796a47b4017b642"},
+    {file = "bokeh-3.4.1.tar.gz", hash = "sha256:d824961e4265367b0750ce58b07e564ad0b83ca64b335521cd3421e9b9f10d89"},
+]
+
+[[package]]
+name = "certifi"
+version = "2024.6.2"
+requires_python = ">=3.6"
+summary = "Python package for providing Mozilla's CA Bundle."
+groups = ["default"]
+files = [
+    {file = "certifi-2024.6.2-py3-none-any.whl", hash = "sha256:ddc6c8ce995e6987e7faf5e3f1b02b302836a0e5d98ece18392cb1a36c72ad56"},
+    {file = "certifi-2024.6.2.tar.gz", hash = "sha256:3cd43f1c6fa7dedc5899d69d3ad0398fd018ad1a17fba83ddaf78aa46c747516"},
+]
+
+[[package]]
+name = "charset-normalizer"
+version = "3.3.2"
+requires_python = ">=3.7.0"
+summary = "The Real First Universal Charset Detector. Open, modern and actively maintained alternative to Chardet."
+groups = ["default"]
+files = [
+    {file = "charset-normalizer-3.3.2.tar.gz", hash = "sha256:f30c3cb33b24454a82faecaf01b19c18562b1e89558fb6c56de4d9118a032fd5"},
+    {file = "charset_normalizer-3.3.2-cp312-cp312-macosx_10_9_universal2.whl", hash = "sha256:0b2b64d2bb6d3fb9112bafa732def486049e63de9618b5843bcdd081d8144cd8"},
+    {file = "charset_normalizer-3.3.2-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:ddbb2551d7e0102e7252db79ba445cdab71b26640817ab1e3e3648dad515003b"},
+    {file = "charset_normalizer-3.3.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:55086ee1064215781fff39a1af09518bc9255b50d6333f2e4c74ca09fac6a8f6"},
+    {file = "charset_normalizer-3.3.2-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8f4a014bc36d3c57402e2977dada34f9c12300af536839dc38c0beab8878f38a"},
+    {file = "charset_normalizer-3.3.2-cp312-cp312-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:a10af20b82360ab00827f916a6058451b723b4e65030c5a18577c8b2de5b3389"},
+    {file = "charset_normalizer-3.3.2-cp312-cp312-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:8d756e44e94489e49571086ef83b2bb8ce311e730092d2c34ca8f7d925cb20aa"},
+    {file = "charset_normalizer-3.3.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:90d558489962fd4918143277a773316e56c72da56ec7aa3dc3dbbe20fdfed15b"},
+    {file = "charset_normalizer-3.3.2-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:6ac7ffc7ad6d040517be39eb591cac5ff87416c2537df6ba3cba3bae290c0fed"},
+    {file = "charset_normalizer-3.3.2-cp312-cp312-musllinux_1_1_aarch64.whl", hash = "sha256:7ed9e526742851e8d5cc9e6cf41427dfc6068d4f5a3bb03659444b4cabf6bc26"},
+    {file = "charset_normalizer-3.3.2-cp312-cp312-musllinux_1_1_i686.whl", hash = "sha256:8bdb58ff7ba23002a4c5808d608e4e6c687175724f54a5dade5fa8c67b604e4d"},
+    {file = "charset_normalizer-3.3.2-cp312-cp312-musllinux_1_1_ppc64le.whl", hash = "sha256:6b3251890fff30ee142c44144871185dbe13b11bab478a88887a639655be1068"},
+    {file = "charset_normalizer-3.3.2-cp312-cp312-musllinux_1_1_s390x.whl", hash = "sha256:b4a23f61ce87adf89be746c8a8974fe1c823c891d8f86eb218bb957c924bb143"},
+    {file = "charset_normalizer-3.3.2-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:efcb3f6676480691518c177e3b465bcddf57cea040302f9f4e6e191af91174d4"},
+    {file = "charset_normalizer-3.3.2-cp312-cp312-win32.whl", hash = "sha256:d965bba47ddeec8cd560687584e88cf699fd28f192ceb452d1d7ee807c5597b7"},
+    {file = "charset_normalizer-3.3.2-cp312-cp312-win_amd64.whl", hash = "sha256:96b02a3dc4381e5494fad39be677abcb5e6634bf7b4fa83a6dd3112607547001"},
+    {file = "charset_normalizer-3.3.2-py3-none-any.whl", hash = "sha256:3e4d1f6587322d2788836a99c69062fbb091331ec940e02d12d179c1d53e25fc"},
+]
+
+[[package]]
+name = "colorama"
+version = "0.4.6"
+requires_python = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
+summary = "Cross-platform colored terminal text."
+groups = ["default"]
+marker = "platform_system == \"Windows\""
+files = [
+    {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
+    {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
+]
+
+[[package]]
+name = "colorcet"
+version = "3.1.0"
+requires_python = ">=3.7"
+summary = "Collection of perceptually uniform colormaps"
+groups = ["default"]
+files = [
+    {file = "colorcet-3.1.0-py3-none-any.whl", hash = "sha256:2a7d59cc8d0f7938eeedd08aad3152b5319b4ba3bcb7a612398cc17a384cb296"},
+    {file = "colorcet-3.1.0.tar.gz", hash = "sha256:2921b3cd81a2288aaf2d63dbc0ce3c26dcd882e8c389cc505d6886bf7aa9a4eb"},
+]
 
 [[package]]
 name = "contourpy"
@@ -64,6 +161,72 @@ files = [
 ]
 
 [[package]]
+name = "holoviews"
+version = "1.18.3"
+requires_python = ">=3.9"
+summary = "Stop plotting your data - annotate your data and let it visualize itself."
+groups = ["default"]
+dependencies = [
+    "colorcet",
+    "numpy>=1.0",
+    "packaging",
+    "pandas>=0.20.0",
+    "panel>=1.0",
+    "param<3.0,>=1.12.0",
+    "pyviz-comms>=0.7.4",
+]
+files = [
+    {file = "holoviews-1.18.3-py2.py3-none-any.whl", hash = "sha256:b94b96560b64a84c07e89115aaf9b226e6009684800ec84d3c88cbad122c0c46"},
+    {file = "holoviews-1.18.3.tar.gz", hash = "sha256:578e30e89d72754f97a83ebe08198fec8e87cc7e49b25b9f31ec393f939ca500"},
+]
+
+[[package]]
+name = "hvplot"
+version = "0.10.0"
+requires_python = ">=3.8"
+summary = "A high-level plotting API for the PyData ecosystem built on HoloViews."
+groups = ["default"]
+dependencies = [
+    "bokeh>=1.0.0",
+    "colorcet>=2",
+    "holoviews>=1.11.0",
+    "numpy>=1.15",
+    "packaging",
+    "pandas",
+    "panel>=0.11.0",
+    "param<3.0,>=1.12.0",
+]
+files = [
+    {file = "hvplot-0.10.0-py3-none-any.whl", hash = "sha256:fe90ccb48163a6a62ae5bd6b008c2cb15cbf5b276f6ad6839ef5470b1c480d16"},
+    {file = "hvplot-0.10.0.tar.gz", hash = "sha256:e87486a95bfe151ab52ef163a5e93d9cbd043992cf0b755ccadd2bf36fedd376"},
+]
+
+[[package]]
+name = "idna"
+version = "3.7"
+requires_python = ">=3.5"
+summary = "Internationalized Domain Names in Applications (IDNA)"
+groups = ["default"]
+files = [
+    {file = "idna-3.7-py3-none-any.whl", hash = "sha256:82fee1fc78add43492d3a1898bfa6d8a904cc97d8427f683ed8e798d07761aa0"},
+    {file = "idna-3.7.tar.gz", hash = "sha256:028ff3aadf0609c1fd278d8ea3089299412a7a8b9bd005dd08b9f8285bcb5cfc"},
+]
+
+[[package]]
+name = "jinja2"
+version = "3.1.4"
+requires_python = ">=3.7"
+summary = "A very fast and expressive template engine."
+groups = ["default"]
+dependencies = [
+    "MarkupSafe>=2.0",
+]
+files = [
+    {file = "jinja2-3.1.4-py3-none-any.whl", hash = "sha256:bc5dd2abb727a5319567b7a813e6a2e7318c39f4f487cfe6c89c6f9c7d25197d"},
+    {file = "jinja2-3.1.4.tar.gz", hash = "sha256:4a3aee7acbbe7303aede8e9648d13b8bf88a429282aa6122a993f0ac800cb369"},
+]
+
+[[package]]
 name = "kiwisolver"
 version = "1.4.5"
 requires_python = ">=3.7"
@@ -104,6 +267,65 @@ files = [
 ]
 
 [[package]]
+name = "linkify-it-py"
+version = "2.0.3"
+requires_python = ">=3.7"
+summary = "Links recognition library with FULL unicode support."
+groups = ["default"]
+dependencies = [
+    "uc-micro-py",
+]
+files = [
+    {file = "linkify-it-py-2.0.3.tar.gz", hash = "sha256:68cda27e162e9215c17d786649d1da0021a451bdc436ef9e0fa0ba5234b9b048"},
+    {file = "linkify_it_py-2.0.3-py3-none-any.whl", hash = "sha256:6bcbc417b0ac14323382aef5c5192c0075bf8a9d6b41820a2b66371eac6b6d79"},
+]
+
+[[package]]
+name = "markdown"
+version = "3.6"
+requires_python = ">=3.8"
+summary = "Python implementation of John Gruber's Markdown."
+groups = ["default"]
+files = [
+    {file = "Markdown-3.6-py3-none-any.whl", hash = "sha256:48f276f4d8cfb8ce6527c8f79e2ee29708508bf4d40aa410fbc3b4ee832c850f"},
+    {file = "Markdown-3.6.tar.gz", hash = "sha256:ed4f41f6daecbeeb96e576ce414c41d2d876daa9a16cb35fa8ed8c2ddfad0224"},
+]
+
+[[package]]
+name = "markdown-it-py"
+version = "3.0.0"
+requires_python = ">=3.8"
+summary = "Python port of markdown-it. Markdown parsing, done right!"
+groups = ["default"]
+dependencies = [
+    "mdurl~=0.1",
+]
+files = [
+    {file = "markdown-it-py-3.0.0.tar.gz", hash = "sha256:e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb"},
+    {file = "markdown_it_py-3.0.0-py3-none-any.whl", hash = "sha256:355216845c60bd96232cd8d8c40e8f9765cc86f46880e43a8fd22dc1a1a8cab1"},
+]
+
+[[package]]
+name = "markupsafe"
+version = "2.1.5"
+requires_python = ">=3.7"
+summary = "Safely add untrusted strings to HTML/XML markup."
+groups = ["default"]
+files = [
+    {file = "MarkupSafe-2.1.5-cp312-cp312-macosx_10_9_universal2.whl", hash = "sha256:8dec4936e9c3100156f8a2dc89c4b88d5c435175ff03413b443469c7c8c5f4d1"},
+    {file = "MarkupSafe-2.1.5-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:3c6b973f22eb18a789b1460b4b91bf04ae3f0c4234a0a6aa6b0a92f6f7b951d4"},
+    {file = "MarkupSafe-2.1.5-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ac07bad82163452a6884fe8fa0963fb98c2346ba78d779ec06bd7a6262132aee"},
+    {file = "MarkupSafe-2.1.5-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f5dfb42c4604dddc8e4305050aa6deb084540643ed5804d7455b5df8fe16f5e5"},
+    {file = "MarkupSafe-2.1.5-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:ea3d8a3d18833cf4304cd2fc9cbb1efe188ca9b5efef2bdac7adc20594a0e46b"},
+    {file = "MarkupSafe-2.1.5-cp312-cp312-musllinux_1_1_aarch64.whl", hash = "sha256:d050b3361367a06d752db6ead6e7edeb0009be66bc3bae0ee9d97fb326badc2a"},
+    {file = "MarkupSafe-2.1.5-cp312-cp312-musllinux_1_1_i686.whl", hash = "sha256:bec0a414d016ac1a18862a519e54b2fd0fc8bbfd6890376898a6c0891dd82e9f"},
+    {file = "MarkupSafe-2.1.5-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:58c98fee265677f63a4385256a6d7683ab1832f3ddd1e66fe948d5880c21a169"},
+    {file = "MarkupSafe-2.1.5-cp312-cp312-win32.whl", hash = "sha256:8590b4ae07a35970728874632fed7bd57b26b0102df2d2b233b6d9d82f6c62ad"},
+    {file = "MarkupSafe-2.1.5-cp312-cp312-win_amd64.whl", hash = "sha256:823b65d8706e32ad2df51ed89496147a42a2a6e01c13cfb6ffb8b1e92bc910bb"},
+    {file = "MarkupSafe-2.1.5.tar.gz", hash = "sha256:d283d37a890ba4c1ae73ffadf8046435c76e7bc2247bbb63c00bd1a709c6544b"},
+]
+
+[[package]]
 name = "matplotlib"
 version = "3.9.0"
 requires_python = ">=3.9"
@@ -132,6 +354,31 @@ files = [
     {file = "matplotlib-3.9.0-pp39-pypy39_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7ff2e239c26be4f24bfa45860c20ffccd118d270c5b5d081fa4ea409b5469fcd"},
     {file = "matplotlib-3.9.0-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:af4001b7cae70f7eaacfb063db605280058246de590fa7874f00f62259f2df7e"},
     {file = "matplotlib-3.9.0.tar.gz", hash = "sha256:e6d29ea6c19e34b30fb7d88b7081f869a03014f66fe06d62cc77d5a6ea88ed7a"},
+]
+
+[[package]]
+name = "mdit-py-plugins"
+version = "0.4.1"
+requires_python = ">=3.8"
+summary = "Collection of plugins for markdown-it-py"
+groups = ["default"]
+dependencies = [
+    "markdown-it-py<4.0.0,>=1.0.0",
+]
+files = [
+    {file = "mdit_py_plugins-0.4.1-py3-none-any.whl", hash = "sha256:1020dfe4e6bfc2c79fb49ae4e3f5b297f5ccd20f010187acc52af2921e27dc6a"},
+    {file = "mdit_py_plugins-0.4.1.tar.gz", hash = "sha256:834b8ac23d1cd60cec703646ffd22ae97b7955a6d596eb1d304be1e251ae499c"},
+]
+
+[[package]]
+name = "mdurl"
+version = "0.1.2"
+requires_python = ">=3.7"
+summary = "Markdown URL utilities"
+groups = ["default"]
+files = [
+    {file = "mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8"},
+    {file = "mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba"},
 ]
 
 [[package]]
@@ -187,6 +434,43 @@ files = [
     {file = "pandas-2.2.2-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:43498c0bdb43d55cb162cdc8c06fac328ccb5d2eabe3cadeb3529ae6f0517c32"},
     {file = "pandas-2.2.2-cp312-cp312-win_amd64.whl", hash = "sha256:d187d355ecec3629624fccb01d104da7d7f391db0311145817525281e2804d23"},
     {file = "pandas-2.2.2.tar.gz", hash = "sha256:9e79019aba43cb4fda9e4d983f8e88ca0373adbb697ae9c6c43093218de28b54"},
+]
+
+[[package]]
+name = "panel"
+version = "1.4.4"
+requires_python = ">=3.9"
+summary = "The powerful data exploration & web app framework for Python."
+groups = ["default"]
+dependencies = [
+    "bleach",
+    "bokeh<3.5.0,>=3.4.0",
+    "linkify-it-py",
+    "markdown",
+    "markdown-it-py",
+    "mdit-py-plugins",
+    "pandas>=1.2",
+    "param<3.0,>=2.1.0",
+    "pyviz-comms>=2.0.0",
+    "requests",
+    "tqdm>=4.48.0",
+    "typing-extensions",
+    "xyzservices>=2021.09.1",
+]
+files = [
+    {file = "panel-1.4.4-py3-none-any.whl", hash = "sha256:b49bb9676567b0c0730bf69348c057247080811aec56364dd4fcfba80e5e09a0"},
+    {file = "panel-1.4.4.tar.gz", hash = "sha256:659e9fc5b495e6519c5d07e8148fa5eeed9bc648356ec83fc299381ba5a726ef"},
+]
+
+[[package]]
+name = "param"
+version = "2.1.0"
+requires_python = ">=3.8"
+summary = "Make your Python code clearer and more reliable by declaring Parameters."
+groups = ["default"]
+files = [
+    {file = "param-2.1.0-py3-none-any.whl", hash = "sha256:f31d3745d227347d29b5868c4e4e3077df07463889b91d3bb28e634fde211e1c"},
+    {file = "param-2.1.0.tar.gz", hash = "sha256:a7b30b08b547e2b78b02aeba6ed34e3c6a638f8e4824a76a96ffa2d7cf57e71f"},
 ]
 
 [[package]]
@@ -280,6 +564,54 @@ files = [
 ]
 
 [[package]]
+name = "pyviz-comms"
+version = "3.0.2"
+requires_python = ">=3.8"
+summary = "A JupyterLab extension for rendering HoloViz content."
+groups = ["default"]
+dependencies = [
+    "param",
+]
+files = [
+    {file = "pyviz_comms-3.0.2-py3-none-any.whl", hash = "sha256:31541b976a21b7738557c3ea23bd8e44e94e736b9ed269570dcc28db4449d7e3"},
+    {file = "pyviz_comms-3.0.2.tar.gz", hash = "sha256:3167df932656416c4bd711205dad47e986a3ebae1f316258ddc26f9e01513ef7"},
+]
+
+[[package]]
+name = "pyyaml"
+version = "6.0.1"
+requires_python = ">=3.6"
+summary = "YAML parser and emitter for Python"
+groups = ["default"]
+files = [
+    {file = "PyYAML-6.0.1-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:855fb52b0dc35af121542a76b9a84f8d1cd886ea97c84703eaa6d88e37a2ad28"},
+    {file = "PyYAML-6.0.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:40df9b996c2b73138957fe23a16a4f0ba614f4c0efce1e9406a184b6d07fa3a9"},
+    {file = "PyYAML-6.0.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a08c6f0fe150303c1c6b71ebcd7213c2858041a7e01975da3a99aed1e7a378ef"},
+    {file = "PyYAML-6.0.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6c22bec3fbe2524cde73d7ada88f6566758a8f7227bfbf93a408a9d86bcc12a0"},
+    {file = "PyYAML-6.0.1-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:8d4e9c88387b0f5c7d5f281e55304de64cf7f9c0021a3525bd3b1c542da3b0e4"},
+    {file = "PyYAML-6.0.1-cp312-cp312-win32.whl", hash = "sha256:d483d2cdf104e7c9fa60c544d92981f12ad66a457afae824d146093b8c294c54"},
+    {file = "PyYAML-6.0.1-cp312-cp312-win_amd64.whl", hash = "sha256:0d3304d8c0adc42be59c5f8a4d9e3d7379e6955ad754aa9d6ab7a398b59dd1df"},
+    {file = "PyYAML-6.0.1.tar.gz", hash = "sha256:bfdf460b1736c775f2ba9f6a92bca30bc2095067b8a9d77876d1fad6cc3b4a43"},
+]
+
+[[package]]
+name = "requests"
+version = "2.32.3"
+requires_python = ">=3.8"
+summary = "Python HTTP for Humans."
+groups = ["default"]
+dependencies = [
+    "certifi>=2017.4.17",
+    "charset-normalizer<4,>=2",
+    "idna<4,>=2.5",
+    "urllib3<3,>=1.21.1",
+]
+files = [
+    {file = "requests-2.32.3-py3-none-any.whl", hash = "sha256:70761cfe03c773ceb22aa2f671b4757976145175cdfca038c02654d061d6dcc6"},
+    {file = "requests-2.32.3.tar.gz", hash = "sha256:55365417734eb18255590a9ff9eb97e9e1da868d4ccd6402399eaf68af20a760"},
+]
+
+[[package]]
 name = "scipy"
 version = "1.13.0"
 requires_python = ">=3.9"
@@ -310,6 +642,51 @@ files = [
 ]
 
 [[package]]
+name = "tornado"
+version = "6.4"
+requires_python = ">= 3.8"
+summary = "Tornado is a Python web framework and asynchronous networking library, originally developed at FriendFeed."
+groups = ["default"]
+files = [
+    {file = "tornado-6.4-cp38-abi3-macosx_10_9_universal2.whl", hash = "sha256:02ccefc7d8211e5a7f9e8bc3f9e5b0ad6262ba2fbb683a6443ecc804e5224ce0"},
+    {file = "tornado-6.4-cp38-abi3-macosx_10_9_x86_64.whl", hash = "sha256:27787de946a9cffd63ce5814c33f734c627a87072ec7eed71f7fc4417bb16263"},
+    {file = "tornado-6.4-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:f7894c581ecdcf91666a0912f18ce5e757213999e183ebfc2c3fdbf4d5bd764e"},
+    {file = "tornado-6.4-cp38-abi3-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:e43bc2e5370a6a8e413e1e1cd0c91bedc5bd62a74a532371042a18ef19e10579"},
+    {file = "tornado-6.4-cp38-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f0251554cdd50b4b44362f73ad5ba7126fc5b2c2895cc62b14a1c2d7ea32f212"},
+    {file = "tornado-6.4-cp38-abi3-musllinux_1_1_aarch64.whl", hash = "sha256:fd03192e287fbd0899dd8f81c6fb9cbbc69194d2074b38f384cb6fa72b80e9c2"},
+    {file = "tornado-6.4-cp38-abi3-musllinux_1_1_i686.whl", hash = "sha256:88b84956273fbd73420e6d4b8d5ccbe913c65d31351b4c004ae362eba06e1f78"},
+    {file = "tornado-6.4-cp38-abi3-musllinux_1_1_x86_64.whl", hash = "sha256:71ddfc23a0e03ef2df1c1397d859868d158c8276a0603b96cf86892bff58149f"},
+    {file = "tornado-6.4-cp38-abi3-win32.whl", hash = "sha256:6f8a6c77900f5ae93d8b4ae1196472d0ccc2775cc1dfdc9e7727889145c45052"},
+    {file = "tornado-6.4-cp38-abi3-win_amd64.whl", hash = "sha256:10aeaa8006333433da48dec9fe417877f8bcc21f48dda8d661ae79da357b2a63"},
+    {file = "tornado-6.4.tar.gz", hash = "sha256:72291fa6e6bc84e626589f1c29d90a5a6d593ef5ae68052ee2ef000dfd273dee"},
+]
+
+[[package]]
+name = "tqdm"
+version = "4.66.4"
+requires_python = ">=3.7"
+summary = "Fast, Extensible Progress Meter"
+groups = ["default"]
+dependencies = [
+    "colorama; platform_system == \"Windows\"",
+]
+files = [
+    {file = "tqdm-4.66.4-py3-none-any.whl", hash = "sha256:b75ca56b413b030bc3f00af51fd2c1a1a5eac6a0c1cca83cbb37a5c52abce644"},
+    {file = "tqdm-4.66.4.tar.gz", hash = "sha256:e4d936c9de8727928f3be6079590e97d9abfe8d39a590be678eb5919ffc186bb"},
+]
+
+[[package]]
+name = "typing-extensions"
+version = "4.12.1"
+requires_python = ">=3.8"
+summary = "Backported and Experimental Type Hints for Python 3.8+"
+groups = ["default"]
+files = [
+    {file = "typing_extensions-4.12.1-py3-none-any.whl", hash = "sha256:6024b58b69089e5a89c347397254e35f1bf02a907728ec7fee9bf0fe837d203a"},
+    {file = "typing_extensions-4.12.1.tar.gz", hash = "sha256:915f5e35ff76f56588223f15fdd5938f9a1cf9195c0de25130c627e4d597f6d1"},
+]
+
+[[package]]
 name = "tzdata"
 version = "2024.1"
 requires_python = ">=2"
@@ -318,4 +695,47 @@ groups = ["default"]
 files = [
     {file = "tzdata-2024.1-py2.py3-none-any.whl", hash = "sha256:9068bc196136463f5245e51efda838afa15aaeca9903f49050dfa2679db4d252"},
     {file = "tzdata-2024.1.tar.gz", hash = "sha256:2674120f8d891909751c38abcdfd386ac0a5a1127954fbc332af6b5ceae07efd"},
+]
+
+[[package]]
+name = "uc-micro-py"
+version = "1.0.3"
+requires_python = ">=3.7"
+summary = "Micro subset of unicode data files for linkify-it-py projects."
+groups = ["default"]
+files = [
+    {file = "uc-micro-py-1.0.3.tar.gz", hash = "sha256:d321b92cff673ec58027c04015fcaa8bb1e005478643ff4a500882eaab88c48a"},
+    {file = "uc_micro_py-1.0.3-py3-none-any.whl", hash = "sha256:db1dffff340817673d7b466ec86114a9dc0e9d4d9b5ba229d9d60e5c12600cd5"},
+]
+
+[[package]]
+name = "urllib3"
+version = "2.2.1"
+requires_python = ">=3.8"
+summary = "HTTP library with thread-safe connection pooling, file post, and more."
+groups = ["default"]
+files = [
+    {file = "urllib3-2.2.1-py3-none-any.whl", hash = "sha256:450b20ec296a467077128bff42b73080516e71b56ff59a60a02bef2232c4fa9d"},
+    {file = "urllib3-2.2.1.tar.gz", hash = "sha256:d0570876c61ab9e520d776c38acbbb5b05a776d3f9ff98a5c8fd5162a444cf19"},
+]
+
+[[package]]
+name = "webencodings"
+version = "0.5.1"
+summary = "Character encoding aliases for legacy web content"
+groups = ["default"]
+files = [
+    {file = "webencodings-0.5.1-py2.py3-none-any.whl", hash = "sha256:a0af1213f3c2226497a97e2b3aa01a7e4bee4f403f95be16fc9acd2947514a78"},
+    {file = "webencodings-0.5.1.tar.gz", hash = "sha256:b36a1c245f2d304965eb4e0a82848379241dc04b865afcc4aab16748587e1923"},
+]
+
+[[package]]
+name = "xyzservices"
+version = "2024.4.0"
+requires_python = ">=3.8"
+summary = "Source of XYZ tiles providers"
+groups = ["default"]
+files = [
+    {file = "xyzservices-2024.4.0-py3-none-any.whl", hash = "sha256:b83e48c5b776c9969fffcfff57b03d02b1b1cd6607a9d9c4e7f568b01ef47f4c"},
+    {file = "xyzservices-2024.4.0.tar.gz", hash = "sha256:6a04f11487a6fb77d92a98984cd107fbd9157fd5e65f929add9c3d6e604ee88c"},
 ]

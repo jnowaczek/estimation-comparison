@@ -28,9 +28,10 @@
 import argparse
 import concurrent.futures
 import logging
-import pickle
+import os
 from concurrent.futures import ProcessPoolExecutor
 import functools
+from dataclasses import dataclass
 from datetime import datetime
 from timeit import default_timer
 from pathlib import Path
@@ -41,11 +42,17 @@ from pandas import DataFrame
 from estimation_comparison.data_collection.estimator import Autocorrelation, ByteCount, Entropy
 
 
+@dataclass
+class _InputFile:
+    path: Path
+    name: str
+
+
 class Benchmark:
     def __init__(self, output_dir: str, workers: int | None, parallel=False):
         self.results: Dict = {}
         self.output_dir = output_dir
-        self.file_list: List[Path] = []
+        self.file_list: List[_InputFile] = []
         self.estimators = {
             "autocorrelation_1k": Autocorrelation({"block_size": 1024}),
             "bytecount_1k": ByteCount({"block_size": 1024}),
@@ -69,7 +76,7 @@ class Benchmark:
             path = Path(s)
             logging.debug(f"Entering directory '{path}'")
             for file in filter(lambda f: f.is_file(), path.glob("**/*")):
-                self.file_list.append(file)
+                self.file_list.append(_InputFile(file, os.path.relpath(file, path)))
                 logging.debug(f"Adding file '{file}'")
         logging.info(
             f"Collected {len(self.file_list)} input file{"s" if len(self.file_list) > 1 else ""} from"
@@ -84,14 +91,14 @@ class Benchmark:
         for instance_name, instance in self.estimators.items():
             for file in self.file_list:
                 try:
-                    data = self._read_cached(file)
+                    data = self._read_cached(file.path)
                     if self.process_pool is not None:
                         future = self.process_pool.submit(instance.estimate, data)
                         future.context = (instance_name, file)
                         tasks.append(future)
                     else:
                         result = instance.estimate(data)
-                        self.results[instance_name][str(file)] = result
+                        self.results[instance_name][file.name] = result
                         completed_tasks += 1
                         logging.info(
                             f"{completed_tasks}/{num_tasks} tasks complete, {completed_tasks / num_tasks * 100:.2f}%")
@@ -103,13 +110,12 @@ class Benchmark:
             for future in concurrent.futures.as_completed(tasks):
                 completed_tasks += 1
                 logging.info(f"{completed_tasks}/{num_tasks} tasks complete, {completed_tasks / num_tasks * 100:.2f}%")
-                self.results[future.context[0]][str(future.context[1])] = future.result()
+                self.results[future.context[0]][future.context[1].name] = future.result()
             self.process_pool.shutdown()
 
         logging.info(f"Benchmark completed in {default_timer() - start_time:.3f} seconds")
 
         dataframe = DataFrame.from_dict(self.results)
-        print(dataframe.head())
 
         output_file = f"{self.output_dir}/benchmark_{datetime.now().isoformat()}.feather"
         dataframe.to_feather(output_file)
