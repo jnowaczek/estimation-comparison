@@ -12,25 +12,10 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import abc
-from typing import Dict
-
-from estimation_comparison.data_collection.algorithm_base import AlgorithmBase
+from abc import ABC, abstractmethod
 
 
-class CompressorBase(AlgorithmBase):
-    parameters: Dict[str, any]
-
-    @abc.abstractmethod
-    def __init__(self, parameters: Dict[str, any]):
-        self.parameters = parameters
-
-    @abc.abstractmethod
-    def compress(self, data: bytes) -> bytes:
+class AlgorithmBase(ABC):
+    @abstractmethod
+    def run(self, data: bytes) -> any:
         pass
-
-    def ratio(self, data: bytes) -> float:
-        return len(data) / len(self.compress(data))
-
-    def run(self, data: bytes) -> float:
-        return self.ratio(data)

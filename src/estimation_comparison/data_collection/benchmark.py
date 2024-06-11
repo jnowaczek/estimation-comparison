@@ -92,17 +92,15 @@ class Benchmark:
 
         tasks = []
         for instance_name, instance in self.algorithms.items():
-            work_func = getattr(instance, "estimate", None) if hasattr(instance, "estimate") else getattr(instance,
-                                                                                                          "compress")
             for file in self.file_list:
                 try:
                     data = self._read_cached(file.path)
                     if self.process_pool is not None:
-                        future = self.process_pool.submit(work_func, data)
+                        future = self.process_pool.submit(instance.run, data)
                         future.context = (instance_name, file)
                         tasks.append(future)
                     else:
-                        result = work_func(data)
+                        result = instance.run(data)
                         self.results[instance_name][file.name] = result
                         completed_tasks += 1
                         logging.info(

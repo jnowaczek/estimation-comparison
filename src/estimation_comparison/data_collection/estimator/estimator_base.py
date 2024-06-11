@@ -13,11 +13,12 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import abc
-from abc import ABC
 from typing import Dict
 
+from estimation_comparison.data_collection.algorithm_base import AlgorithmBase
 
-class EstimatorBase(ABC):
+
+class EstimatorBase(AlgorithmBase):
     parameters: Dict[str, any]
 
     @abc.abstractmethod
@@ -27,3 +28,6 @@ class EstimatorBase(ABC):
     @abc.abstractmethod
     def estimate(self, data: bytes) -> any:
         pass
+
+    def run(self, data: bytes) -> any:
+        return self.estimate(data)
