@@ -12,21 +12,18 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import abc
-from abc import ABC
 from typing import Dict
+import zlib
+
+from estimation_comparison.data_collection.compressor.compressor_base import CompressorBase
 
 
-class CompressorBase(ABC):
-    parameters: Dict[str, any]
-
-    @abc.abstractmethod
+class GzipCompressor(CompressorBase):
     def __init__(self, parameters: Dict[str, any]):
-        self.parameters = parameters
+        for parameter in ["level"]:
+            if parameter not in parameters:
+                raise ValueError(f"Missing required parameter: '{parameter}'")
+        super().__init__(parameters)
 
-    @abc.abstractmethod
     def compress(self, data: bytes) -> bytes:
-        pass
-
-    def ratio(self, data: bytes) -> float:
-        return len(data) / len(self.compress(data))
+        return zlib.compress(data, level=self.parameters["level"], wbits=31)

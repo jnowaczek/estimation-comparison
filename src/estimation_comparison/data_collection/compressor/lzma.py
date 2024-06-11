@@ -12,21 +12,18 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import abc
-from abc import ABC
 from typing import Dict
+import lzma
+
+from estimation_comparison.data_collection.compressor.compressor_base import CompressorBase
 
 
-class CompressorBase(ABC):
-    parameters: Dict[str, any]
-
-    @abc.abstractmethod
+class LzmaCompressor(CompressorBase):
     def __init__(self, parameters: Dict[str, any]):
-        self.parameters = parameters
+        for parameter in []:
+            if parameter not in parameters:
+                raise ValueError(f"Missing required parameter: '{parameter}'")
+        super().__init__(parameters)
 
-    @abc.abstractmethod
     def compress(self, data: bytes) -> bytes:
-        pass
-
-    def ratio(self, data: bytes) -> float:
-        return len(data) / len(self.compress(data))
+        return lzma.compress(data)

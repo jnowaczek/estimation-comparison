@@ -29,6 +29,7 @@ import argparse
 import concurrent.futures
 import logging
 import os
+import pickle
 from concurrent.futures import ProcessPoolExecutor
 import functools
 from dataclasses import dataclass
@@ -37,8 +38,8 @@ from timeit import default_timer
 from pathlib import Path
 from typing import List, Dict
 
-from pandas import DataFrame
-
+from estimation_comparison.data_collection.compressor.gzip import GzipCompressor
+from estimation_comparison.data_collection.compressor.lzma import LzmaCompressor
 from estimation_comparison.data_collection.estimator import Autocorrelation, ByteCount, Entropy
 
 
@@ -53,23 +54,25 @@ class Benchmark:
         self.results: Dict = {}
         self.output_dir = output_dir
         self.file_list: List[_InputFile] = []
-        self.estimators = {
+        self._estimators = {
             "autocorrelation_1k": Autocorrelation({"block_size": 1024}),
             "bytecount_1k": ByteCount({"block_size": 1024}),
             "bytecount_file": ByteCount({"block_size": None}),
-            "entropy_bits": Entropy({"base": 2})
+            "entropy_bits": Entropy({"base": 2}),
         }
+        self._compressors = {
+            "gzip_max": GzipCompressor({"level": 9}),
+            "lzma": LzmaCompressor({}),
+        }
+        self.algorithms = self._estimators | self._compressors
 
-        for key in self.estimators:
+        for key in self.algorithms:
             self.results[key] = {}
 
         if parallel:
             self.process_pool = ProcessPoolExecutor(max_workers=workers)
         else:
             self.process_pool = None
-
-    def setup_algorithms(self):
-        pass
 
     def build_file_list(self, locations: List[str]):
         for s in locations:
@@ -84,20 +87,22 @@ class Benchmark:
 
     def run(self):
         start_time = default_timer()
-        num_tasks = len(self.file_list) * len(self.estimators.values())
+        num_tasks = len(self.file_list) * len(self.algorithms.values())
         completed_tasks = 0
 
         tasks = []
-        for instance_name, instance in self.estimators.items():
+        for instance_name, instance in self.algorithms.items():
+            work_func = getattr(instance, "estimate", None) if hasattr(instance, "estimate") else getattr(instance,
+                                                                                                          "compress")
             for file in self.file_list:
                 try:
                     data = self._read_cached(file.path)
                     if self.process_pool is not None:
-                        future = self.process_pool.submit(instance.estimate, data)
+                        future = self.process_pool.submit(work_func, data)
                         future.context = (instance_name, file)
                         tasks.append(future)
                     else:
-                        result = instance.estimate(data)
+                        result = work_func(data)
                         self.results[instance_name][file.name] = result
                         completed_tasks += 1
                         logging.info(
@@ -115,11 +120,10 @@ class Benchmark:
 
         logging.info(f"Benchmark completed in {default_timer() - start_time:.3f} seconds")
 
-        dataframe = DataFrame.from_dict(self.results)
-
-        output_file = f"{self.output_dir}/benchmark_{datetime.now().isoformat()}.feather"
-        dataframe.to_feather(output_file)
-        logging.info(f"Results written to '{output_file}'")
+        output_file = f"{self.output_dir}/benchmark_{datetime.now().isoformat()}.pkl"
+        with open(output_file, "wb") as f:
+            pickle.dump(self.results, f)
+            logging.info(f"Results written to '{output_file}'")
 
     @functools.cache
     def _read_cached(self, path):
