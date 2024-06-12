@@ -16,13 +16,13 @@ import argparse
 import logging
 import pickle
 from concurrent.futures import ProcessPoolExecutor
+from datetime import datetime
 from pathlib import Path
 
-import hvplot
-import matplotlib.pyplot as plt
-import pandas as pd
+import bokeh.plotting
+from bokeh.plotting import figure, show
 
-from estimation_comparison.analysis.plot import plot_entropy_bits, plot_scalar, plot_bytecount_file
+from estimation_comparison.analysis.plot import PlotHandler
 
 
 class Analyze:
@@ -30,6 +30,9 @@ class Analyze:
         self.data = None
         self.output_dir = output_dir
         self.workers = workers
+        self.plot_handler = None
+
+        bokeh.plotting.output_file(f"{self.output_dir}/plot_{datetime.now().isoformat()}.html")
 
         if parallel:
             self.process_pool = ProcessPoolExecutor(max_workers=workers)
@@ -39,25 +42,24 @@ class Analyze:
     def load(self, filename: str):
         suffix = Path(filename).suffix
         match suffix:
-            case ".feather":
-                self.data = pd.read_feather(filename)
+            case ".pkl":
+                self.data = pickle.load(open(filename, "rb"))
             case _:
                 raise ValueError(f"Unsupported file type: {suffix}")
+        self.plot_handler = PlotHandler(self.data)
 
     def run(self):
         plots = {}
 
-        for estimator in self.data.keys():
-            match estimator:
-                case "entropy_bits":
-                    plots[estimator] = plot_entropy_bits(self.data[estimator])
-                case "bytecount_file":
-                    plots[estimator] = plot_bytecount_file(self.data[estimator])
-                case _:
-                    logging.error(f"Not plotting unsupported estimator: {estimator}")
+        for algorithm in self.data.keys():
+            # for file in self.data[algorithm].keys():
+            plots[algorithm] = self.plot_handler.individual_plot(algorithm)
 
-        for i, p in enumerate(plots.values()):
-            hvplot.save(p, f"{self.output_dir}/{i}.html")
+        plots["compression_ratio"] = self.plot_handler.ratio_plot()
+
+        for name, p in plots.items():
+            if p is not None:
+                show(p)
 
 
 if __name__ == "__main__":

@@ -12,31 +12,45 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+import functools
+import logging
+from typing import Callable
 
-import matplotlib.pyplot as plt
-import hvplot.pandas
+import numpy as np
+from bokeh.models import ColumnDataSource, FactorRange
+from bokeh.palettes import Category10
+from bokeh.plotting import figure, output_file, show
+from bokeh.transform import factor_cmap
 from pandas import DataFrame
 
 
-def plot_scalar(df: DataFrame, columns: [str]):
-    # fig, ax = plt.subplots(dpi=300)
-    # ax.tick_params(axis="x", labelrotation=90)
-    # for path, value in results.items():
-    #     ax.bar(str(path), value)
-    # fig.subplots_adjust(bottom=.5)
-    # fig.show()
-    plot = df.hvplot.bar(rot=90) + df.hvplot.table(columns=columns, sortable=True)
-    return plot
+class PlotHandler:
+    def __init__(self, data):
+        self._data = data
+        self.palette = Category10[10]
 
+    def individual_plot(self, algorithm: str) -> any:
+        match algorithm:
+            case "entropy_bits" | "bytecount_file" | "gzip_max" | "lzma":
+                pass
+            case _:
+                logging.error(f"Unable to plot unknown estimator: {algorithm}")
+                return None
 
-def plot_vector(results):
-    for file in results.keys():
-        print(file)
+    def ratio_plot(self) -> any:
+        return self.adjacent_bars_all_files("Compression Ratio", ["gzip_max", "lzma"])
 
+    def adjacent_bars_all_files(self, title: str, algorithms: [str]) -> any:
+        files = self._data[algorithms[0]].keys()
+        x = [(file, algorithm) for file in files for algorithm in algorithms]
+        data = sum(list(tuple(self._data[d][f] for d in algorithms) for f in files), ())
+        source = ColumnDataSource(data=dict(x=x, metric=data))
 
-def plot_entropy_bits(df):
-    return plot_scalar(df, ["index", "entropy_bits"])
-
-
-def plot_bytecount_file(df):
-    return plot_scalar(df, ["index", "bytecount_file"])
+        plot = figure(title=title, x_range=FactorRange(*x), sizing_mode="stretch_width")
+        plot.vbar(x="x",
+                  top="metric",
+                  source=source,
+                  fill_color=factor_cmap("x", palette=self.palette, factors=algorithms, start=1, end=2))
+        plot.xaxis.major_label_orientation = np.pi / 2
+        plot.xaxis.group_label_orientation = np.pi / 2
+        return plot
