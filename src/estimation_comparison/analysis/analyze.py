@@ -77,7 +77,10 @@ class Analyze:
         #     for file in self.data[algorithm].keys():
         #         plots[algorithm] = self.plot_handler.individual_plot(algorithm)
 
-        plots["compression_ratio"] = self.plot_handler.ratio_plot()
+        plots["compression_ratio"] = self.plot_handler.ratio_plot("lzma Result",
+                                                                  algorithms=["entropy_bits Result",
+                                                                              "bytecount_file Result"]
+                                                                  )
 
         for name, p in plots.items():
             if p is not None:

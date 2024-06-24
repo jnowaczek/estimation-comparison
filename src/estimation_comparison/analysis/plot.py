@@ -36,27 +36,19 @@ class PlotHandler:
                 logging.error(f"Unable to plot unknown estimator: {algorithm}")
                 return None
 
-    def ratio_plot(self) -> any:
-        algorithms = ["lzma Result", "entropy_bits Result", "bytecount_file Result"]
-        print(self._data.head())
-        subset = self._data[algorithms]
-        # subset = self._data[algorithms].melt(id_vars="lzma Result", var_name="Algorithm", value_name="Result", ignore_index=False)
-        # subset["Algorithm"] = subset["Algorithm"].str.removesuffix(" Result")
-        print(subset.to_string())
+    def ratio_plot(self, x_axis: str, algorithms: [str]) -> any:
+        subset = self._data[[*algorithms, x_axis]]
         datasource = ColumnDataSource(subset)
-        plot = figure(title="", sizing_mode="stretch_both")
-        plot.scatter(
-            "lzma Result",
-            "entropy_bits Result",
-            source=datasource,
-            color="red"
-        )
-        plot.scatter(
-            "lzma Result",
-            "bytecount_file Result",
-            source=datasource,
-            color="blue"
-        )
+        plot = figure(title="Compression Ratio vs Estimator Metric", sizing_mode="stretch_both",
+                      tooltips=[("Metric", "$snap_y"), ("File name", "@index")])
+        for y, color in zip(algorithms, self.palette):
+            plot.scatter(
+                x_axis,
+                y,
+                source=datasource,
+                color=color,
+                legend_label=y.removesuffix(" Result"),
+            )
         plot.legend.location = "top_left"
         return plot
 
