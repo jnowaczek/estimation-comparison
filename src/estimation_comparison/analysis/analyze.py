@@ -20,6 +20,7 @@ from datetime import datetime
 from pathlib import Path
 
 import bokeh.plotting
+import pandas as pd
 from bokeh.plotting import figure, show
 
 from estimation_comparison.analysis.plot import PlotHandler
@@ -27,6 +28,7 @@ from estimation_comparison.analysis.plot import PlotHandler
 
 class Analyze:
     def __init__(self, output_dir: str, workers: int | None, parallel=False):
+        self.raw_data = None
         self.data = None
         self.output_dir = output_dir
         self.workers = workers
@@ -39,21 +41,41 @@ class Analyze:
         else:
             self.process_pool = None
 
+    def _create_dataframe(self):
+        """
+        Create a pandas dataframe with the following structure:
+
+        +-------+-------+-------+-----------+
+        |       | Algo1 | Algo2 | Algo3     |
+        +=======+=======+=======+===========+
+        | File1 | 1     | [1]   | [[1],[1]] |
+        +-------+-------+-------+-----------+
+        | File2 | 2     | [2]   | [[2],[2]] |
+        +-------+-------+-------+-----------+
+        | File3 | 3     | [3]   | [[3],[3]] |
+        +-------+-------+-------+-----------+
+
+        :return:
+        """
+        self.data = pd.DataFrame.from_dict(self.raw_data, orient='index')
+        logging.info(f"Loaded {self.data.shape} dataframe")
+
     def load(self, filename: str):
         suffix = Path(filename).suffix
         match suffix:
             case ".pkl":
-                self.data = pickle.load(open(filename, "rb"))
+                self.raw_data = pickle.load(open(filename, "rb"))
             case _:
                 raise ValueError(f"Unsupported file type: {suffix}")
+        self._create_dataframe()
         self.plot_handler = PlotHandler(self.data)
 
     def run(self):
         plots = {}
 
-        for algorithm in self.data.keys():
-            # for file in self.data[algorithm].keys():
-            plots[algorithm] = self.plot_handler.individual_plot(algorithm)
+        # for algorithm in self.raw_data.keys():
+        #     for file in self.data[algorithm].keys():
+        #         plots[algorithm] = self.plot_handler.individual_plot(algorithm)
 
         plots["compression_ratio"] = self.plot_handler.ratio_plot()
 

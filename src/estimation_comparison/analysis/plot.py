@@ -12,21 +12,20 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import functools
 import logging
-from typing import Callable
 
+import bokeh.colors.util
 import numpy as np
 from bokeh.models import ColumnDataSource, FactorRange
-from bokeh.palettes import Category10
-from bokeh.plotting import figure, output_file, show
+from bokeh.palettes import Category10, Category10_3, Category10_4
+from bokeh.plotting import figure
 from bokeh.transform import factor_cmap
 from pandas import DataFrame
 
 
 class PlotHandler:
-    def __init__(self, data):
-        self._data = data
+    def __init__(self, df: DataFrame):
+        self._data = df
         self.palette = Category10[10]
 
     def individual_plot(self, algorithm: str) -> any:
@@ -38,7 +37,28 @@ class PlotHandler:
                 return None
 
     def ratio_plot(self) -> any:
-        return self.adjacent_bars_all_files("Compression Ratio", ["gzip_max", "lzma"])
+        algorithms = ["lzma Result", "entropy_bits Result", "bytecount_file Result"]
+        print(self._data.head())
+        subset = self._data[algorithms]
+        # subset = self._data[algorithms].melt(id_vars="lzma Result", var_name="Algorithm", value_name="Result", ignore_index=False)
+        # subset["Algorithm"] = subset["Algorithm"].str.removesuffix(" Result")
+        print(subset.to_string())
+        datasource = ColumnDataSource(subset)
+        plot = figure(title="", sizing_mode="stretch_both")
+        plot.scatter(
+            "lzma Result",
+            "entropy_bits Result",
+            source=datasource,
+            color="red"
+        )
+        plot.scatter(
+            "lzma Result",
+            "bytecount_file Result",
+            source=datasource,
+            color="blue"
+        )
+        plot.legend.location = "top_left"
+        return plot
 
     def adjacent_bars_all_files(self, title: str, algorithms: [str]) -> any:
         files = self._data[algorithms[0]].keys()
@@ -53,4 +73,6 @@ class PlotHandler:
                   fill_color=factor_cmap("x", palette=self.palette, factors=algorithms, start=1, end=2))
         plot.xaxis.major_label_orientation = np.pi / 2
         plot.xaxis.group_label_orientation = np.pi / 2
+        plot.xaxis.major_label_text_font_size = "1em"
+        plot.xaxis.group_text_font_size = "1em"
         return plot

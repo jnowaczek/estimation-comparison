@@ -3,20 +3,19 @@ name = "estimation-comparison"
 version = "0.1.0"
 description = "Run compression estimation algorithms on files"
 authors = [
-    {name = "Julian Nowaczek", email = "jnowaczek@users.noreply.github.com"},
+    { name = "Julian Nowaczek", email = "jnowaczek@users.noreply.github.com" },
 ]
 dependencies = [
     "numpy>=1.26.4",
     "scipy>=1.13.0",
     "matplotlib>=3.9.0",
     "pandas>=2.2.2",
-    "pyarrow>=16.1.0",
-    "jupyterlab>=4.2.1",
     "bokeh>=3.4.1",
+    "pyarrow>=16.1.0",
 ]
 requires-python = "==3.12.*"
 readme = "README.md"
-license = {text = "GPL-3.0-or-later"}
+license = { text = "GPL-3.0-or-later" }
 
 
 [tool.pdm]

@@ -66,9 +66,6 @@ class Benchmark:
         }
         self.algorithms = self._estimators | self._compressors
 
-        for key in self.algorithms:
-            self.results[key] = {}
-
         if parallel:
             self.process_pool = ProcessPoolExecutor(max_workers=workers)
         else:
@@ -85,6 +82,9 @@ class Benchmark:
             f"Collected {len(self.file_list)} input file{"s" if len(self.file_list) > 1 else ""} from"
             f" {len(locations)} directory{"s" if len(locations) > 1 else ""}")
 
+        for file in self.file_list:
+            self.results[file.name] = {}
+
     def run(self):
         start_time = default_timer()
         num_tasks = len(self.file_list) * len(self.algorithms.values())
@@ -97,11 +97,12 @@ class Benchmark:
                     data = self._read_cached(file.path)
                     if self.process_pool is not None:
                         future = self.process_pool.submit(instance.run, data)
-                        future.context = (instance_name, file)
+                        future.context = (instance_name, instance, file)
                         tasks.append(future)
                     else:
                         result = instance.run(data)
-                        self.results[instance_name][file.name] = result
+                        self.results[file.name] |= {f"{instance_name} Parameters": instance.parameters,
+                                                    f"{instance_name} Result": result}
                         completed_tasks += 1
                         logging.info(
                             f"{completed_tasks}/{num_tasks} tasks complete, {completed_tasks / num_tasks * 100:.2f}%")
@@ -113,7 +114,9 @@ class Benchmark:
             for future in concurrent.futures.as_completed(tasks):
                 completed_tasks += 1
                 logging.info(f"{completed_tasks}/{num_tasks} tasks complete, {completed_tasks / num_tasks * 100:.2f}%")
-                self.results[future.context[0]][future.context[1].name] = future.result()
+                self.results[future.context[2].name] |= {
+                    f"{future.context[0]} Parameters": future.context[1].parameters,
+                    f"{future.context[0]} Result": future.result()}
             self.process_pool.shutdown()
 
         logging.info(f"Benchmark completed in {default_timer() - start_time:.3f} seconds")
