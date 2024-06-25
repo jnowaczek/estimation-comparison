@@ -102,7 +102,7 @@ class Benchmark:
                     else:
                         result = instance.run(data)
                         self.results[file.name] |= {f"{instance_name} Parameters": instance.parameters,
-                                                    f"{instance_name} Result": result}
+                                                    f"{instance_name}": result}
                         completed_tasks += 1
                         logging.info(
                             f"{completed_tasks}/{num_tasks} tasks complete, {completed_tasks / num_tasks * 100:.2f}%")
@@ -116,7 +116,7 @@ class Benchmark:
                 logging.info(f"{completed_tasks}/{num_tasks} tasks complete, {completed_tasks / num_tasks * 100:.2f}%")
                 self.results[future.context[2].name] |= {
                     f"{future.context[0]} Parameters": future.context[1].parameters,
-                    f"{future.context[0]} Result": future.result()}
+                    f"{future.context[0]}": future.result()}
             self.process_pool.shutdown()
 
         logging.info(f"Benchmark completed in {default_timer() - start_time:.3f} seconds")

@@ -39,16 +39,19 @@ class PlotHandler:
     def ratio_plot(self, x_axis: str, algorithms: [str]) -> any:
         subset = self._data[[*algorithms, x_axis]]
         datasource = ColumnDataSource(subset)
-        plot = figure(title="Compression Ratio vs Estimator Metric", sizing_mode="stretch_both",
-                      tooltips=[("Metric", "$snap_y"), ("File name", "@index")])
+        plot = figure(title=f"{x_axis} Compression Ratio vs Estimator Metric", sizing_mode="stretch_both",
+                      tooltips=[("Estimator", "$name"), ("Metric", "$snap_y"), ("File name", "@index")])
         for y, color in zip(algorithms, self.palette):
             plot.scatter(
                 x_axis,
                 y,
                 source=datasource,
                 color=color,
-                legend_label=y.removesuffix(" Result"),
+                legend_label=y,
+                name=y
             )
+        plot.xaxis.axis_label = f"{x_axis} Compression Ratio"
+        plot.yaxis.axis_label = f"Estimator Metric"
         plot.legend.location = "top_left"
         return plot
 
