@@ -41,6 +41,6 @@ class ByteCount(EstimatorBase):
 
             # Use actual block size in case we get a small block at the end
             threshold = len(block) / len(appearances)
-            results.append(len(list(filter(lambda x: x > threshold, appearances.tolist()))))
+            results.append(len(list(filter(lambda x: x >= threshold, appearances.tolist()))))
 
         return results
