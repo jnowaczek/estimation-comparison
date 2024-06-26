@@ -138,7 +138,7 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true")
     parser.add_argument("-p", "--parallel", dest="parallel", action="store_true")
     parser.add_argument("-w", "--workers", type=int, dest="workers", default=None)
-    parser.add_argument("-o", "--output_dir", type=str, dest="output_dir", default=".")
+    parser.add_argument("-o", "--output_dir", type=str, dest="output_dir", default="./output")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)

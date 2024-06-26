@@ -15,13 +15,13 @@
 import argparse
 import logging
 import pickle
+import webbrowser
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
-import bokeh.plotting
 import pandas as pd
-from bokeh.plotting import figure, show
+from bokeh.io import save
 
 from estimation_comparison.analysis.plot import PlotHandler
 
@@ -33,8 +33,6 @@ class Analyze:
         self.output_dir = output_dir
         self.workers = workers
         self.plot_handler = None
-
-        bokeh.plotting.output_file(f"{self.output_dir}/plot_{datetime.now().isoformat()}.html")
 
         if parallel:
             self.process_pool = ProcessPoolExecutor(max_workers=workers)
@@ -78,18 +76,22 @@ class Analyze:
         #         plots[algorithm] = self.plot_handler.individual_plot(algorithm)
 
         plots["compression_ratio_lzma"] = self.plot_handler.ratio_plot("lzma",
-                                                                  algorithms=["entropy_bits",
-                                                                              "bytecount_file"]
-                                                                  )
+                                                                       algorithms=["entropy_bits",
+                                                                                   "bytecount_file"]
+                                                                       )
 
         plots["compression_ratio_gzip_max"] = self.plot_handler.ratio_plot("gzip_max",
-                                                                  algorithms=["entropy_bits",
-                                                                              "bytecount_file"]
-                                                                  )
+                                                                           algorithms=["entropy_bits",
+                                                                                       "bytecount_file"]
+                                                                           )
 
+        save_time = datetime.now().isoformat(timespec="seconds")
         for name, p in plots.items():
             if p is not None:
-                show(p)
+                filename = f"{self.output_dir}/plot_{save_time}_{name}.html"
+                save(p, filename, resources="cdn", title=name)
+                if args.open_in_browser:
+                    webbrowser.open_new_tab(filename)
 
 
 if __name__ == "__main__":
@@ -100,8 +102,9 @@ if __name__ == "__main__":
                         help="enable parallelized plot generation")
     parser.add_argument("-w", "--workers", type=int, dest="workers", default=None,
                         help="number of parallel workers, defaults to number of cores")
-    parser.add_argument("-o", "--output_dir", type=str, dest="output_dir", default=".",
+    parser.add_argument("-o", "--output_dir", type=str, dest="output_dir", default="./output",
                         help="plot output directory")
+    parser.add_argument("-b", "--browser", dest="open_in_browser", action="store_true", )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
