@@ -19,7 +19,9 @@ import webbrowser
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 from pathlib import Path
+from typing import Callable
 
+import numpy as np
 import pandas as pd
 from bokeh.io import save
 
@@ -65,24 +67,26 @@ class Analyze:
                 self.raw_data = pickle.load(open(filename, "rb"))
             case _:
                 raise ValueError(f"Unsupported file type: {suffix}")
+        logging.info(f"Loaded '{filename}'")
         self._create_dataframe()
         self.plot_handler = PlotHandler(self.data)
 
     def run(self):
         plots = {}
 
-        # for algorithm in self.raw_data.keys():
-        #     for file in self.data[algorithm].keys():
-        #         plots[algorithm] = self.plot_handler.individual_plot(algorithm)
+        for algorithm in self.data.columns:
+            plots[algorithm] = self.plot_handler.individual_plot(algorithm)
 
         plots["compression_ratio_lzma"] = self.plot_handler.ratio_plot("lzma",
                                                                        algorithms=["entropy_bits",
-                                                                                   "bytecount_file"]
+                                                                                   "bytecount_file",
+                                                                                   "autocorrelation_1k_scalar_max"]
                                                                        )
 
         plots["compression_ratio_gzip_max"] = self.plot_handler.ratio_plot("gzip_max",
                                                                            algorithms=["entropy_bits",
-                                                                                       "bytecount_file"]
+                                                                                       "bytecount_file",
+                                                                                       "autocorrelation_1k_scalar_max"]
                                                                            )
 
         save_time = datetime.now().isoformat(timespec="seconds")
@@ -96,20 +100,27 @@ class Analyze:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("file", type=str, help="input file to analyze")
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true")
+    parser.add_argument("-i", "--input_dir", type=Path, dest="input_dir", default="./benchmarks",
+                        help="directory to load benchmark data from")
+    parser.add_argument("-f", "--file", type=Path, help="path to input file to analyze")
     parser.add_argument("-p", "--parallel", dest="parallel", action="store_true",
                         help="enable parallelized plot generation")
     parser.add_argument("-w", "--workers", type=int, dest="workers", default=None,
                         help="number of parallel workers, defaults to number of cores")
-    parser.add_argument("-o", "--output_dir", type=str, dest="output_dir", default="./output",
+    parser.add_argument("-o", "--output_dir", type=Path, dest="output_dir", default="./output",
                         help="plot output directory")
-    parser.add_argument("-b", "--browser", dest="open_in_browser", action="store_true", )
+    parser.add_argument("-b", "--browser", dest="open_in_browser", action="store_true",
+                        help="open plots in default browser after rendering")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
 
     analyze = Analyze(args.output_dir, workers=args.workers, parallel=args.parallel)
-    analyze.load(args.file)
+
+    if args.file is not None:
+        analyze.load(args.file)
+    else:
+        analyze.load(sorted(args.input_dir.glob("benchmark*"))[-1])
 
     analyze.run()
