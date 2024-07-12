@@ -12,11 +12,12 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+import itertools
 import logging
 
 import bokeh.colors.util
 import numpy as np
-from bokeh.models import ColumnDataSource, FactorRange
+from bokeh.models import ColumnDataSource, FactorRange, HoverTool
 from bokeh.palettes import Category10, Category10_3, Category10_4
 from bokeh.plotting import figure
 from bokeh.transform import factor_cmap
@@ -32,6 +33,8 @@ class PlotHandler:
         match algorithm:
             case "entropy_bits" | "bytecount_file" | "gzip_max" | "lzma":
                 pass
+            case "autocorrelation_1k" as a:
+                return self.line_plot_all_files(a)
             case _:
                 logging.error(f"Unable to plot unknown estimator: {algorithm}")
                 return None
@@ -53,6 +56,19 @@ class PlotHandler:
         plot.xaxis.axis_label = f"{x_axis} Compression Ratio"
         plot.yaxis.axis_label = f"Estimator Metric"
         plot.legend.location = "top_left"
+        return plot
+
+    def line_plot_all_files(self, algorithm: str) -> any:
+        plot = figure(title=f"{algorithm} vs Block Index", sizing_mode="stretch_both",
+                      tooltips=[("File name", "$name"), ("Metric", "$snap_y")])
+        for file, data, color in zip(*self._data[algorithm].items(), itertools.cycle(self.palette)):
+            plot.scatter(
+                list(range(0, len(data[0]))),
+                data[0],
+                name=file,
+                color=color,
+            )
+        plot.add_tools(HoverTool(tooltips=None))
         return plot
 
     def adjacent_bars_all_files(self, title: str, algorithms: [str]) -> any:

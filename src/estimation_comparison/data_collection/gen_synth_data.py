@@ -36,6 +36,7 @@ class SyntheticDataGenerator():
         self.file_specs: [_SynthDataFileSpec] = [
             _SynthDataFileSpec("zeroes", lambda size: b"\x00" * size),
             _SynthDataFileSpec("count", lambda size: bytes([x % 256 for x in range(0, size)])),
+            _SynthDataFileSpec("count_64", lambda size: bytes([x % 64 for x in range(0, size)])),
         ]
 
     def run(self):

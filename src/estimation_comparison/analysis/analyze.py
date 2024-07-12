@@ -19,7 +19,6 @@ import webbrowser
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -60,8 +59,39 @@ class Analyze:
         self.data = pd.DataFrame.from_dict(self.raw_data, orient='index')
         logging.info(f"Loaded {self.data.shape} dataframe")
 
-    def load(self, filename: str):
-        suffix = Path(filename).suffix
+    def _create_computed_columns(self):
+        def autocorrelation_scalar_max(data):
+            peak = 0.0
+            for chunk in data:
+                for corr in chunk:
+                    if abs(corr) > peak:
+                        peak = abs(corr)
+            return peak
+
+        def autocorrelation_vector_max(data):
+            peaks = []
+            for chunk in data:
+                peak = 0.0
+                for corr in chunk:
+                    if abs(corr) > peak:
+                        peak = abs(corr)
+                peaks.append(peak)
+            return peaks
+
+        def autocorrelation_mean(data):
+            means = []
+            for chunk in data:
+                means.append(np.mean(chunk))
+            return means
+
+        # self.data["autocorrelation_1k_vector_max"] = self.data["autocorrelation_1k"].apply(autocorrelation_vector_max)
+        # self.data["autocorrelation_1k_scalar_max"] = self.data["autocorrelation_1k"].apply(autocorrelation_scalar_max)
+        # self.data["autocorrelation_1k_mean"] = self.data["autocorrelation_1k"].apply(autocorrelation_mean)
+        # self.data["autocorrelation_1k_mean_mean"] = self.data["autocorrelation_1k_mean"].apply(np.mean)
+        # self.data["autocorrelation_1k_mean_max"] = self.data["autocorrelation_1k_mean"].apply(max)
+
+    def load(self, filename: Path):
+        suffix = filename.suffix
         match suffix:
             case ".pkl":
                 self.raw_data = pickle.load(open(filename, "rb"))
@@ -69,6 +99,7 @@ class Analyze:
                 raise ValueError(f"Unsupported file type: {suffix}")
         logging.info(f"Loaded '{filename}'")
         self._create_dataframe()
+        self._create_computed_columns()
         self.plot_handler = PlotHandler(self.data)
 
     def run(self):
@@ -80,13 +111,13 @@ class Analyze:
         plots["compression_ratio_lzma"] = self.plot_handler.ratio_plot("lzma",
                                                                        algorithms=["entropy_bits",
                                                                                    "bytecount_file",
-                                                                                   "autocorrelation_1k_scalar_max"]
+                                                                                   ]
                                                                        )
 
         plots["compression_ratio_gzip_max"] = self.plot_handler.ratio_plot("gzip_max",
                                                                            algorithms=["entropy_bits",
-                                                                                       "bytecount_file",
-                                                                                       "autocorrelation_1k_scalar_max"]
+                                                                                       "bytecount_file"
+                                                                                       ]
                                                                            )
 
         save_time = datetime.now().isoformat(timespec="seconds")
