@@ -18,7 +18,7 @@ import logging
 import bokeh.colors.util
 import numpy as np
 from bokeh.models import ColumnDataSource, FactorRange, HoverTool
-from bokeh.palettes import Category10, Category10_3, Category10_4
+from bokeh.palettes import Category20
 from bokeh.plotting import figure
 from bokeh.transform import factor_cmap
 from pandas import DataFrame
@@ -27,7 +27,7 @@ from pandas import DataFrame
 class PlotHandler:
     def __init__(self, df: DataFrame):
         self._data = df
-        self.palette = Category10[10]
+        self.palette = Category20[20]
 
     def individual_plot(self, algorithm: str) -> any:
         match algorithm:
@@ -61,7 +61,7 @@ class PlotHandler:
     def line_plot_all_files(self, algorithm: str) -> any:
         plot = figure(title=f"{algorithm} vs Block Index", sizing_mode="stretch_both",
                       tooltips=[("File name", "$name"), ("Metric", "$snap_y")])
-        for file, data, color in zip(*self._data[algorithm].items(), itertools.cycle(self.palette)):
+        for ((file, data), color) in zip(self._data[algorithm].items(), itertools.cycle(self.palette)):
             plot.scatter(
                 list(range(0, len(data[0]))),
                 data[0],
