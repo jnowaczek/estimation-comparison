@@ -19,12 +19,17 @@ import random
 from concurrent import futures
 from concurrent.futures import ProcessPoolExecutor
 from hashlib import file_digest
+from io import BytesIO
 from pathlib import Path
 
 import requests
+from wand.image import Image
+from wand.sequence import SingleImage
 
-# SHA256 hash of the RAISE dataset CSV: http://loki.disi.unitn.it/RAISE/download.html
+# SHA256 hashes of the RAISE dataset CSV: http://loki.disi.unitn.it/RAISE/download.html
+RAISE_1K_SHA256 = "b388d84a73b17f3c1790a55e28777c6b9bed2806b2a86b9fc05ed28b863cc8c7"
 RAISE_ALL_SHA256 = "2d78a40847564a4d2e810377b8b208c7207c25d11e1b7b2b10c6de5395c760d3"
+RAISE_HASHES = [RAISE_1K_SHA256, RAISE_ALL_SHA256]
 
 
 class RaiseDownloader:
@@ -41,8 +46,8 @@ class RaiseDownloader:
         try:
             if not self.force_download:
                 with open(self.path, "rb") as f:
-                    if not file_digest(f, "sha256").hexdigest() == RAISE_ALL_SHA256:
-                        logging.error(f"RAISE dataset CSV does not match hash {RAISE_ALL_SHA256}")
+                    if not file_digest(f, "sha256").hexdigest() in RAISE_HASHES:
+                        logging.error(f"CSV hash does not match known dataset hash, --skip-hash-check to override")
                         exit(1)
 
             with open(self.path, "r", newline="") as f:
@@ -59,20 +64,26 @@ class RaiseDownloader:
             tasks = []
 
             for file in self.filelist:
-                tasks.append(executor.submit(self._get_file, file["TIFF"], self.output_dir / file["File"]))
+                tasks.append(executor.submit(self._get_and_magick_file, file["TIFF"], self.output_dir / file["File"]))
 
             for _ in futures.as_completed(tasks):
                 completed_tasks += 1
                 logging.info(
-                    f"{completed_tasks}/{len(self.filelist)} images downloaded, {completed_tasks / len(self.filelist) * 100:.2f}%")
+                    f"{completed_tasks}/{len(self.filelist)} downloaded and cleaned, "
+                    f"{completed_tasks / len(self.filelist) * 100:.2f}%")
             executor.shutdown()
 
     @staticmethod
-    def _get_file(url: str, dest_path: Path):
-        r = requests.get(url, stream=True)
-        with open(dest_path, "wb") as f:
-            for chunk in r.iter_content(chunk_size=1024):
-                f.write(chunk)
+    def _get_and_magick_file(url: str, dest_path: Path):
+        r = requests.get(url)
+        with Image(blob=r.content, format="tiff") as img:
+            # Remove metadata to prevent it from skewing compression ratio
+            img.strip()
+            # Remove all but the first TIFF layer
+            for x in range(1, len(img.sequence)):
+                del img.sequence[x]
+            with open(dest_path, "wb") as f:
+                img.save(file=f)
 
 
 if __name__ == "__main__":

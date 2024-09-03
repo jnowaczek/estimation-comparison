@@ -5,7 +5,7 @@
 groups = ["default"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:42adebf03585ff33ad4aaf27409a4760841d4bd07db142dcec9f2996d5a958f7"
+content_hash = "sha256:8aa51cae0925feaabf08dde51edf22dcd07718d04f87a3393e0240a173d55840"
 
 [[metadata.targets]]
 requires_python = ">=3.12"
@@ -595,6 +595,16 @@ groups = ["default"]
 files = [
     {file = "urllib3-2.2.2-py3-none-any.whl", hash = "sha256:a448b2f64d686155468037e1ace9f2d2199776e17f0a46610480d311f73e3472"},
     {file = "urllib3-2.2.2.tar.gz", hash = "sha256:dd505485549a7a552833da5e6063639d0d177c04f23bc3864e41e5dc5f612168"},
+]
+
+[[package]]
+name = "wand"
+version = "0.6.13"
+summary = "Ctypes-based simple MagickWand API binding for Python"
+groups = ["default"]
+files = [
+    {file = "Wand-0.6.13-py2.py3-none-any.whl", hash = "sha256:e5dda0ac2204a40c29ef5c4cb310770c95d3d05c37b1379e69c94ea79d7d19c0"},
+    {file = "Wand-0.6.13.tar.gz", hash = "sha256:f5013484eaf7a20eb22d1821aaefe60b50cc329722372b5f8565d46d4aaafcca"},
 ]
 
 [[package]]
