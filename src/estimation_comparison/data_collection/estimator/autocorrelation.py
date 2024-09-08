@@ -35,10 +35,13 @@ class Autocorrelation(EstimatorBase):
             normalized_block = np.subtract(block, mean)
             numerator = signal.correlate(normalized_block, normalized_block)
             denominator = np.sum(normalized_block * normalized_block)
+            del normalized_block
             block_result = numerator / denominator
+            del numerator, denominator
             if self.parameters["block_summary_function"] is not None:
                 block_result = self.parameters["block_summary_function"](block_result)
             acf.append(block_result)
+            del block_result
 
         if self.parameters["file_summary_function"] is not None:
             acf = self.parameters["file_summary_function"](acf)

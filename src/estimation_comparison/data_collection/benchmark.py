@@ -39,8 +39,11 @@ from timeit import default_timer
 from pathlib import Path
 from typing import List, Dict
 
+import numpy as np
+
 from estimation_comparison.data_collection.compressor.image.jxl import JpegXlCompressor
 from estimation_comparison.data_collection.estimator import Autocorrelation, ByteCount, Entropy
+from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch
 
 
 @dataclass
@@ -55,9 +58,14 @@ class Benchmark:
         self.output_dir = output_dir
         self.file_list: List[_InputFile] = []
         self._estimators = {
-            "autocorrelation_1k": Autocorrelation({"block_size": 1024}),
-            "autocorrelation_10k": Autocorrelation({"block_size": 10240}),
-            # "bytecount_1k": ByteCount({"block_size": 1024}),
+            "autocorrelation_1k": Autocorrelation(
+                {"block_size": 1024,
+                 "block_summary_function": functools.partial(max_outside_middle_notch, notch_width=16),
+                 "file_summary_function": np.mean}),
+            "autocorrelation_4k": Autocorrelation(
+                {"block_size": 4096,
+                 "block_summary_function": functools.partial(max_outside_middle_notch, notch_width=16),
+                 "file_summary_function": np.mean}),
             "bytecount_file": ByteCount({"block_size": None}),
             "entropy_bits": Entropy({"base": 2}),
         }

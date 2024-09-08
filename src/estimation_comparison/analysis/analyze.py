@@ -112,6 +112,7 @@ class Analyze:
                                                                       algorithms=[#"entropy_bits",
                                                                                   #"bytecount_file",
                                                                                   "autocorrelation_1k",
+                                                                                  "autocorrelation_4k",
                                                                                   ]
                                                                       )
 
