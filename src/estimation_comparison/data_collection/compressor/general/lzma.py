@@ -13,17 +13,17 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from typing import Dict
-import zlib
+import lzma
 
-from estimation_comparison.data_collection.compressor.compressor_base import CompressorBase
+from estimation_comparison.data_collection.compressor.general.base import GeneralCompressorBase
 
 
-class GzipCompressor(CompressorBase):
+class LzmaCompressor(GeneralCompressorBase):
     def __init__(self, parameters: Dict[str, any]):
-        for parameter in ["level"]:
+        for parameter in []:
             if parameter not in parameters:
                 raise ValueError(f"Missing required parameter: '{parameter}'")
         super().__init__(parameters)
 
     def compress(self, data: bytes) -> bytes:
-        return zlib.compress(data, level=self.parameters["level"], wbits=31)
+        return lzma.compress(data)

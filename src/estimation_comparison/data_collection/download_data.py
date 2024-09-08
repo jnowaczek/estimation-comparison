@@ -24,7 +24,6 @@ from pathlib import Path
 
 import requests
 from wand.image import Image
-from wand.sequence import SingleImage
 
 # SHA256 hashes of the RAISE dataset CSV: http://loki.disi.unitn.it/RAISE/download.html
 RAISE_1K_SHA256 = "b388d84a73b17f3c1790a55e28777c6b9bed2806b2a86b9fc05ed28b863cc8c7"

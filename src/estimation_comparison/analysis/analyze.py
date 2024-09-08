@@ -108,17 +108,12 @@ class Analyze:
         for algorithm in self.data.columns:
             plots[algorithm] = self.plot_handler.individual_plot(algorithm)
 
-        plots["compression_ratio_lzma"] = self.plot_handler.ratio_plot("lzma",
-                                                                       algorithms=["entropy_bits",
-                                                                                   "bytecount_file",
-                                                                                   ]
-                                                                       )
-
-        plots["compression_ratio_gzip_max"] = self.plot_handler.ratio_plot("gzip_max",
-                                                                           algorithms=["entropy_bits",
-                                                                                       "bytecount_file"
-                                                                                       ]
-                                                                           )
+        plots["compression_ratio_jxl"] = self.plot_handler.ratio_plot("jxl",
+                                                                      algorithms=[#"entropy_bits",
+                                                                                  #"bytecount_file",
+                                                                                  "autocorrelation_1k",
+                                                                                  ]
+                                                                      )
 
         save_time = datetime.now().isoformat(timespec="seconds")
         for name, p in plots.items():

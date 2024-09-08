@@ -23,7 +23,7 @@ from estimation_comparison.data_collection.estimator.estimator_base import Estim
 
 class Autocorrelation(EstimatorBase):
     def __init__(self, parameters: Dict[str, any]):
-        for parameter in ["block_size"]:
+        for parameter in ["block_size", "block_summary_function", "file_summary_function"]:
             if parameter not in parameters:
                 raise ValueError(f"Missing required parameter: '{parameter}'")
         super().__init__(parameters)
@@ -35,6 +35,11 @@ class Autocorrelation(EstimatorBase):
             normalized_block = np.subtract(block, mean)
             numerator = signal.correlate(normalized_block, normalized_block)
             denominator = np.sum(normalized_block * normalized_block)
-            acf.append(numerator / denominator)
+            block_result = numerator / denominator
+            if self.parameters["block_summary_function"] is not None:
+                block_result = self.parameters["block_summary_function"](block_result)
+            acf.append(block_result)
 
+        if self.parameters["file_summary_function"] is not None:
+            acf = self.parameters["file_summary_function"](acf)
         return acf

@@ -12,17 +12,3 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import numpy as np
-from imagecodecs import jpegxl_encode
-
-from typing import Dict
-
-from estimation_comparison.data_collection.compressor.compressor_base import CompressorBase
-
-
-class JpegXlCompressor(CompressorBase):
-    def __init__(self, parameters: Dict[str, any]):
-        super().__init__(parameters)
-
-    def compress(self, data: bytes) -> bytes:
-        return jpegxl_encode(np.array(data, dtype=np.uint8, ndmin=2), lossless=True, planar=True)

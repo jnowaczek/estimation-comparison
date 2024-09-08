@@ -34,7 +34,8 @@ class PlotHandler:
             case "entropy_bits" | "bytecount_file" | "gzip_max" | "lzma":
                 pass
             case "autocorrelation_1k" as a:
-                return self.line_plot_all_files(a)
+                # return self.line_plot_all_files(a)
+                pass
             case _:
                 logging.error(f"Unable to plot unknown estimator: {algorithm}")
                 return None

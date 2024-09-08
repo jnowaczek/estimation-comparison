@@ -30,6 +30,7 @@ import concurrent.futures
 import logging
 import os
 import pickle
+import random
 from concurrent.futures import ProcessPoolExecutor
 import functools
 from dataclasses import dataclass
@@ -38,8 +39,7 @@ from timeit import default_timer
 from pathlib import Path
 from typing import List, Dict
 
-from estimation_comparison.data_collection.compressor.gzip import GzipCompressor
-from estimation_comparison.data_collection.compressor.lzma import LzmaCompressor
+from estimation_comparison.data_collection.compressor.image.jxl import JpegXlCompressor
 from estimation_comparison.data_collection.estimator import Autocorrelation, ByteCount, Entropy
 
 
@@ -56,13 +56,13 @@ class Benchmark:
         self.file_list: List[_InputFile] = []
         self._estimators = {
             "autocorrelation_1k": Autocorrelation({"block_size": 1024}),
-            "bytecount_1k": ByteCount({"block_size": 1024}),
+            "autocorrelation_10k": Autocorrelation({"block_size": 10240}),
+            # "bytecount_1k": ByteCount({"block_size": 1024}),
             "bytecount_file": ByteCount({"block_size": None}),
             "entropy_bits": Entropy({"base": 2}),
         }
         self._compressors = {
-            "gzip_max": GzipCompressor({"level": 9}),
-            "lzma": LzmaCompressor({}),
+            "jxl": JpegXlCompressor({}),
         }
         self.algorithms = self._estimators | self._compressors
 
@@ -71,7 +71,7 @@ class Benchmark:
         else:
             self.process_pool = None
 
-    def build_file_list(self, locations: List[str]):
+    def build_file_list(self, locations: List[str], file_limit: int):
         for s in locations:
             path = Path(s)
             logging.debug(f"Entering directory '{path}'")
@@ -81,6 +81,12 @@ class Benchmark:
         logging.info(
             f"Collected {len(self.file_list)} input file{"s" if len(self.file_list) > 1 else ""} from"
             f" {len(locations)} directory{"s" if len(locations) > 1 else ""}")
+
+        if file_limit > 0:
+            random.seed("autocorrelation")
+            random.shuffle(self.file_list)
+            self.file_list = self.file_list[:file_limit]
+            logging.info(f"Truncated file list to {file_limit} files.")
 
         for file in self.file_list:
             self.results[file.name] = {}
@@ -114,9 +120,12 @@ class Benchmark:
             for future in concurrent.futures.as_completed(tasks):
                 completed_tasks += 1
                 logging.info(f"{completed_tasks}/{num_tasks} tasks complete, {completed_tasks / num_tasks * 100:.2f}%")
-                self.results[future.context[2].name] |= {
-                    f"{future.context[0]} Parameters": future.context[1].parameters,
-                    f"{future.context[0]}": future.result()}
+                try:
+                    self.results[future.context[2].name] |= {
+                        f"{future.context[0]} Parameters": future.context[1].parameters,
+                        f"{future.context[0]}": future.result()}
+                except Exception as e:
+                    logging.exception(f"Input file '{future.context[2].name}' raised exception\n\t{e}")
             self.process_pool.shutdown()
 
         logging.info(f"Benchmark completed in {default_timer() - start_time:.3f} seconds")
@@ -138,12 +147,13 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true")
     parser.add_argument("-p", "--parallel", dest="parallel", action="store_true")
     parser.add_argument("-w", "--workers", type=int, dest="workers", default=None)
+    parser.add_argument("-l", "--limit-files", type=int, dest="file_limit", default=0)
     parser.add_argument("-o", "--output_dir", type=str, dest="output_dir", default="./benchmarks")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
 
     benchmark = Benchmark(args.output_dir, workers=args.workers, parallel=args.parallel)
-    benchmark.build_file_list(args.dir)
+    benchmark.build_file_list(args.dir, args.file_limit)
 
     benchmark.run()

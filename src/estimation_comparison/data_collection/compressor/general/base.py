@@ -18,7 +18,7 @@ from typing import Dict
 from estimation_comparison.data_collection.algorithm_base import AlgorithmBase
 
 
-class CompressorBase(AlgorithmBase):
+class GeneralCompressorBase(AlgorithmBase):
     parameters: Dict[str, any]
 
     @abc.abstractmethod
