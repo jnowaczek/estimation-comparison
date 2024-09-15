@@ -111,8 +111,9 @@ class Analyze:
         plots["compression_ratio_jxl"] = self.plot_handler.ratio_plot("jxl",
                                                                       algorithms=[#"entropy_bits",
                                                                                   #"bytecount_file",
-                                                                                  "autocorrelation_1k",
-                                                                                  "autocorrelation_4k",
+                                                                                  "autocorrelation_1k_16",
+                                                                                  "autocorrelation_1k_32",
+                                                                                  "autocorrelation_1k_64",
                                                                                   ]
                                                                       )
 

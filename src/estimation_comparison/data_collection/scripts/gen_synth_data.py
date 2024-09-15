@@ -12,7 +12,6 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 import argparse
 import dataclasses
 import logging
@@ -50,7 +49,7 @@ class SyntheticDataGenerator():
                 f.write(file_spec.gen(1024 * 10))
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true")
     parser.add_argument("-o", "--output_dir", type=Path, dest="output_dir", default="synthetic")
@@ -61,3 +60,7 @@ if __name__ == "__main__":
     sdg = SyntheticDataGenerator(args.output_dir)
 
     sdg.run()
+
+
+if __name__ == "__main__":
+    main()

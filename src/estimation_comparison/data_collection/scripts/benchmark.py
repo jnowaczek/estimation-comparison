@@ -12,19 +12,6 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-#  This program is free software: you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation, either version 3 of the License, or
-#  (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import argparse
 import concurrent.futures
 import logging
@@ -58,16 +45,20 @@ class Benchmark:
         self.output_dir = output_dir
         self.file_list: List[_InputFile] = []
         self._estimators = {
-            "autocorrelation_1k": Autocorrelation(
+            "autocorrelation_1k_16": Autocorrelation(
                 {"block_size": 1024,
                  "block_summary_function": functools.partial(max_outside_middle_notch, notch_width=16),
                  "file_summary_function": np.mean}),
-            "autocorrelation_4k": Autocorrelation(
-                {"block_size": 4096,
-                 "block_summary_function": functools.partial(max_outside_middle_notch, notch_width=16),
+            "autocorrelation_1k_32": Autocorrelation(
+                {"block_size": 1024,
+                 "block_summary_function": functools.partial(max_outside_middle_notch, notch_width=32),
                  "file_summary_function": np.mean}),
-            "bytecount_file": ByteCount({"block_size": None}),
-            "entropy_bits": Entropy({"base": 2}),
+            "autocorrelation_1k_64": Autocorrelation(
+                {"block_size": 1024,
+                 "block_summary_function": functools.partial(max_outside_middle_notch, notch_width=64),
+                 "file_summary_function": np.mean}),
+            # "bytecount_file": ByteCount({"block_size": None}),
+            # "entropy_bits": Entropy({"base": 2}),
         }
         self._compressors = {
             "jxl": JpegXlCompressor({}),
@@ -149,7 +140,7 @@ class Benchmark:
             return f.read()
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("dir", action="append")
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true")
@@ -165,3 +156,7 @@ if __name__ == "__main__":
     benchmark.build_file_list(args.dir, args.file_limit)
 
     benchmark.run()
+
+
+if __name__ == "__main__":
+    main()

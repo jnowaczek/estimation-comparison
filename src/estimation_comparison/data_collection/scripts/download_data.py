@@ -85,7 +85,7 @@ class RaiseDownloader:
                 img.save(file=f)
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true")
     parser.add_argument("-s", "--skip-hash-check", dest="skip_hash_check", action="store_true", default=False)
@@ -98,3 +98,7 @@ if __name__ == "__main__":
     d = RaiseDownloader(args.csv_path, args.skip_hash_check, args.output_dir)
 
     d.run()
+
+
+if __name__ == "__main__":
+    main()

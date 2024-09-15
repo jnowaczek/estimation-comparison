@@ -12,18 +12,3 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import numpy as np
-from imagecodecs import tiff_decode, jpegxl_encode
-
-from typing import Dict
-
-from estimation_comparison.data_collection.compressor.image.base import ImageCompressorBase
-
-
-class JpegXlCompressor(ImageCompressorBase):
-    def __init__(self, parameters: Dict[str, any]):
-        super().__init__(parameters)
-
-    def compress(self, data: bytes) -> bytes:
-        nda = tiff_decode(data)
-        return jpegxl_encode(nda, lossless=True)
