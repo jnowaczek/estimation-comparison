@@ -6,13 +6,13 @@ authors = [
     { name = "Julian Nowaczek", email = "jnowaczek@users.noreply.github.com" },
 ]
 dependencies = [
-    "numpy>=2.1.0",
+    "numpy>=2.1.1",
     "scipy>=1.14.1",
     "matplotlib>=3.9.2",
-    "pandas>=2.2.2",
+    "pandas>=2.2.3",
     "bokeh>=3.5.2",
     "pyarrow>=17.0.0",
-    "imagecodecs[all]>=2024.6.1",
+    "imagecodecs[all]>=2024.9.22",
     "requests>=2.32.3",
     "wand>=0.6.13",
 ]
@@ -20,6 +20,11 @@ requires-python = ">=3.12"
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }
 
+[project.scripts]
+benchmark = "estimation_comparison.data_collection.scripts.benchmark:main"
+download_data = "estimation_comparison.data_collection.scripts.download_data:main"
+gen_synth_data = "estimation_comparison.data_collection.scripts.gen_synth_data:main"
 
 [tool.pdm]
-distribution = false
+distribution = true
+

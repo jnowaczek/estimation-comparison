@@ -22,6 +22,7 @@ from concurrent.futures import ProcessPoolExecutor
 import functools
 from dataclasses import dataclass
 from datetime import datetime
+from multiprocessing.managers import SharedMemoryManager
 from timeit import default_timer
 from pathlib import Path
 from typing import List, Dict
@@ -96,10 +97,15 @@ class Benchmark:
         completed_tasks = 0
 
         tasks = []
-        for instance_name, instance in self.algorithms.items():
-            for file in self.file_list:
+        for file in self.file_list:
+            try:
+                with open(file.path, "rb") as f:
+                    data = f.read()
+            except OSError as e:
+                logging.exception(f"Error reading data file '{file.path}': {e}")
+
+            for instance_name, instance in self.algorithms.items():
                 try:
-                    data = self._read_cached(file.path)
                     if self.process_pool is not None:
                         future = self.process_pool.submit(instance.run, data)
                         future.context = (instance_name, instance, file)
@@ -125,6 +131,8 @@ class Benchmark:
                         f"{future.context[0]}": future.result()}
                 except Exception as e:
                     logging.exception(f"Input file '{future.context[2].name}' raised exception\n\t{e}")
+                finally:
+                    del future
             self.process_pool.shutdown()
 
         logging.info(f"Benchmark completed in {default_timer() - start_time:.3f} seconds")
@@ -133,11 +141,6 @@ class Benchmark:
         with open(output_file, "wb") as f:
             pickle.dump(self.results, f)
             logging.info(f"Results written to '{output_file}'")
-
-    @functools.cache
-    def _read_cached(self, path):
-        with open(path, "rb") as f:
-            return f.read()
 
 
 def main():
