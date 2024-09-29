@@ -30,7 +30,7 @@ from estimation_comparison.analysis.plot import PlotHandler
 class Analyze:
     def __init__(self, output_dir: str, workers: int | None, parallel=False):
         self.raw_data = None
-        self.data = None
+        self.data: pd.DataFrame | None = None
         self.output_dir = output_dir
         self.workers = workers
         self.plot_handler = None
@@ -59,37 +59,6 @@ class Analyze:
         self.data = pd.DataFrame.from_dict(self.raw_data, orient='index')
         logging.info(f"Loaded {self.data.shape} dataframe")
 
-    def _create_computed_columns(self):
-        def autocorrelation_scalar_max(data):
-            peak = 0.0
-            for chunk in data:
-                for corr in chunk:
-                    if abs(corr) > peak:
-                        peak = abs(corr)
-            return peak
-
-        def autocorrelation_vector_max(data):
-            peaks = []
-            for chunk in data:
-                peak = 0.0
-                for corr in chunk:
-                    if abs(corr) > peak:
-                        peak = abs(corr)
-                peaks.append(peak)
-            return peaks
-
-        def autocorrelation_mean(data):
-            means = []
-            for chunk in data:
-                means.append(np.mean(chunk))
-            return means
-
-        # self.data["autocorrelation_1k_vector_max"] = self.data["autocorrelation_1k"].apply(autocorrelation_vector_max)
-        # self.data["autocorrelation_1k_scalar_max"] = self.data["autocorrelation_1k"].apply(autocorrelation_scalar_max)
-        # self.data["autocorrelation_1k_mean"] = self.data["autocorrelation_1k"].apply(autocorrelation_mean)
-        # self.data["autocorrelation_1k_mean_mean"] = self.data["autocorrelation_1k_mean"].apply(np.mean)
-        # self.data["autocorrelation_1k_mean_max"] = self.data["autocorrelation_1k_mean"].apply(max)
-
     def load(self, filename: Path):
         suffix = filename.suffix
         match suffix:
@@ -99,22 +68,39 @@ class Analyze:
                 raise ValueError(f"Unsupported file type: {suffix}")
         logging.info(f"Loaded '{filename}'")
         self._create_dataframe()
-        self._create_computed_columns()
         self.plot_handler = PlotHandler(self.data)
 
     def run(self):
+        for algorithm in filter(lambda x: "Parameters" not in x, self.data.columns):
+            print(f"{algorithm}: {self.data[algorithm].corr(self.data['jxl'])}")
+
         plots = {}
 
         for algorithm in self.data.columns:
             plots[algorithm] = self.plot_handler.individual_plot(algorithm)
 
-        plots["compression_ratio_jxl"] = self.plot_handler.ratio_plot("jxl",
-                                                                      algorithms=[#"entropy_bits",
-                                                                                  #"bytecount_file",
-                                                                                  "autocorrelation_1k_16",
-                                                                                  "autocorrelation_1k_32",
-                                                                                  "autocorrelation_1k_64",
-                                                                                  ]
+
+        # plots["compression_ratio_jxl"] = self.plot_handler.ratio_plot("jxl",
+        #                                                               algorithms=[  # "entropy_bits",
+        #                                                                   # "bytecount_file",
+        #                                                                   "autocorrelation_1k_768_cutoff_mean",
+        #                                                                   "autocorrelation_1k_768_cutoff_max",
+        #                                                                   "autocorrelation_1k_64_notch_mean",
+        #                                                                   "autocorrelation_1k_896_cutoff_max_max",
+        #                                                                   "autocorrelation_1k_768_cutoff_max_mean",
+        #                                                                   "autocorrelation_1k_896_cutoff_mean",
+        #                                                                   "autocorrelation_1k_768_cutoff_max_max",
+        #                                                                   "autocorrelation_1k_896_cutoff_max",
+        #                                                                   "autocorrelation_1k_64_notch_max",
+        #                                                                   "autocorrelation_1k_768_cutoff_mean",
+        #                                                                   "autocorrelation_1k_896_cutoff_max_mean",
+        #                                                               ]
+        #                                                               )
+        plots["compression_ratio_jxl_single"] = self.plot_handler.ratio_plot("jxl",
+                                                                      algorithms=[  # "entropy_bits",
+                                                                          # "bytecount_file",
+                                                                          "autocorrelation_1k_64_notch_mean",
+                                                                      ]
                                                                       )
 
         save_time = datetime.now().isoformat(timespec="seconds")

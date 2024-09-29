@@ -19,3 +19,9 @@ import numpy as np
 
 def max_outside_middle_notch(x, notch_width: int):
     return np.max(x[:math.floor((len(x) / 2) - notch_width)])
+
+def proportion_below_cutoff(x, cutoff: int):
+    return np.sum(np.abs(x[:cutoff])) / np.sum(np.abs(x))
+
+def max_below_cutoff(x, cutoff: int):
+    return np.max(x[:cutoff])

@@ -17,7 +17,8 @@ import logging
 
 import bokeh.colors.util
 import numpy as np
-from bokeh.models import ColumnDataSource, FactorRange, HoverTool
+import scipy
+from bokeh.models import ColumnDataSource, FactorRange, HoverTool, Label
 from bokeh.palettes import Category20
 from bokeh.plotting import figure
 from bokeh.transform import factor_cmap

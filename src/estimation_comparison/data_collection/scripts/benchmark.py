@@ -14,6 +14,7 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import argparse
 import concurrent.futures
+import hashlib
 import logging
 import os
 import pickle
@@ -30,34 +31,59 @@ from typing import List, Dict
 import numpy as np
 
 from estimation_comparison.data_collection.compressor.image.jxl import JpegXlCompressor
+from estimation_comparison.data_collection.database import BenchmarkDatabase, InputFile
 from estimation_comparison.data_collection.estimator import Autocorrelation, ByteCount, Entropy
-from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch
-
-
-@dataclass
-class _InputFile:
-    path: Path
-    name: str
+from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch, proportion_below_cutoff, \
+    max_below_cutoff
 
 
 class Benchmark:
     def __init__(self, output_dir: str, workers: int | None, parallel=False):
         self.results: Dict = {}
         self.output_dir = output_dir
-        self.file_list: List[_InputFile] = []
+        self.file_list: List[InputFile] = []
+        self.database = BenchmarkDatabase(Path(self.output_dir) / "benchmark.sqlite")
         self._estimators = {
-            "autocorrelation_1k_16": Autocorrelation(
-                {"block_size": 1024,
-                 "block_summary_function": functools.partial(max_outside_middle_notch, notch_width=16),
+            "autocorrelation_1k_64_notch_mean": Autocorrelation(
+                {"block_size": 67108864,
+                 "block_summary_function": functools.partial(max_outside_middle_notch, notch_width=32768),
                  "file_summary_function": np.mean}),
-            "autocorrelation_1k_32": Autocorrelation(
-                {"block_size": 1024,
-                 "block_summary_function": functools.partial(max_outside_middle_notch, notch_width=32),
-                 "file_summary_function": np.mean}),
-            "autocorrelation_1k_64": Autocorrelation(
-                {"block_size": 1024,
-                 "block_summary_function": functools.partial(max_outside_middle_notch, notch_width=64),
-                 "file_summary_function": np.mean}),
+            # "autocorrelation_1k_64_notch_max": Autocorrelation(
+            #     {"block_size": 1024,
+            #      "block_summary_function": functools.partial(max_outside_middle_notch, notch_width=64),
+            #      "file_summary_function": np.max}),
+            # "autocorrelation_1k_768_cutoff_mean": Autocorrelation(
+            #     {"block_size": 1024,
+            #      "block_summary_function": functools.partial(proportion_below_cutoff, cutoff=768),
+            #      "file_summary_function": np.mean}),
+            # "autocorrelation_1k_896_cutoff_mean": Autocorrelation(
+            #     {"block_size": 1024,
+            #      "block_summary_function": functools.partial(proportion_below_cutoff, cutoff=896),
+            #      "file_summary_function": np.mean}),
+            # "autocorrelation_1k_768_cutoff_max": Autocorrelation(
+            #     {"block_size": 1024,
+            #      "block_summary_function": functools.partial(proportion_below_cutoff, cutoff=768),
+            #      "file_summary_function": np.max}),
+            # "autocorrelation_1k_896_cutoff_max": Autocorrelation(
+            #     {"block_size": 1024,
+            #      "block_summary_function": functools.partial(max_below_cutoff, cutoff=896),
+            #      "file_summary_function": np.max}),
+            # "autocorrelation_1k_768_cutoff_max_mean": Autocorrelation(
+            #     {"block_size": 1024,
+            #      "block_summary_function": functools.partial(max_below_cutoff, cutoff=768),
+            #      "file_summary_function": np.mean}),
+            # "autocorrelation_1k_896_cutoff_max_mean": Autocorrelation(
+            #     {"block_size": 1024,
+            #      "block_summary_function": functools.partial(max_below_cutoff, cutoff=896),
+            #      "file_summary_function": np.mean}),
+            # "autocorrelation_1k_768_cutoff_max_max": Autocorrelation(
+            #     {"block_size": 1024,
+            #      "block_summary_function": functools.partial(max_below_cutoff, cutoff=768),
+            #      "file_summary_function": np.max}),
+            # "autocorrelation_1k_896_cutoff_max_max": Autocorrelation(
+            #     {"block_size": 1024,
+            #      "block_summary_function": functools.partial(max_below_cutoff, cutoff=896),
+            #      "file_summary_function": np.max}),
             # "bytecount_file": ByteCount({"block_size": None}),
             # "entropy_bits": Entropy({"base": 2}),
         }
@@ -71,25 +97,33 @@ class Benchmark:
         else:
             self.process_pool = None
 
-    def build_file_list(self, locations: List[str], file_limit: int):
+    def update_database(self, locations: List[str]):
+        def _hash_file(p: Path) -> str:
+            with open(p, "rb") as f:
+                return hashlib.file_digest(f, hashlib.sha256).hexdigest()
+
+        logging.info("Updating benchmark database file list")
+        hash_tasks = []
+
+        # Glob 'em, hash 'em, and INSERT 'em
         for s in locations:
             path = Path(s)
             logging.debug(f"Entering directory '{path}'")
             for file in filter(lambda f: f.is_file(), path.glob("**/*")):
-                self.file_list.append(_InputFile(file, os.path.relpath(file, path)))
-                logging.debug(f"Adding file '{file}'")
-        logging.info(
-            f"Collected {len(self.file_list)} input file{"s" if len(self.file_list) > 1 else ""} from"
-            f" {len(locations)} directory{"s" if len(locations) > 1 else ""}")
+                if self.process_pool is not None:
+                    future = self.process_pool.submit(_hash_file, file)
+                    future.context = (str(file), os.path.relpath(file, path))
+                    hash_tasks.append(future)
+                else:
+                    self.file_list.append(
+                        InputFile(_hash_file(file), str(file),
+                                  os.path.relpath(file, path)))
+                    logging.debug(f"Adding file '{file}'")
 
-        if file_limit > 0:
-            random.seed("autocorrelation")
-            random.shuffle(self.file_list)
-            self.file_list = self.file_list[:file_limit]
-            logging.info(f"Truncated file list to {file_limit} files.")
-
-        for file in self.file_list:
-            self.results[file.name] = {}
+        if self.process_pool is not None:
+            for future in concurrent.futures.as_completed(hash_tasks):
+                self.database.update_file(
+                    InputFile(future.result(), future.context[0], future.context[1]))
 
     def run(self):
         start_time = default_timer()
@@ -156,7 +190,7 @@ def main():
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
 
     benchmark = Benchmark(args.output_dir, workers=args.workers, parallel=args.parallel)
-    benchmark.build_file_list(args.dir, args.file_limit)
+    benchmark.update_database(args.dir)
 
     benchmark.run()
 
