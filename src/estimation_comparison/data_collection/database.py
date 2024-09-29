@@ -18,33 +18,62 @@ from pathlib import Path
 from typing import NamedTuple
 
 InputFile = NamedTuple("InputFile", [("hash", str), ("path", str), ("name", str)])
+Ratio = NamedTuple("Ratio", [("algorithm", str), ("ratio", float)])
 
 
 class BenchmarkDatabase:
     def __init__(self, db_path: Path):
         self.con = sqlite3.connect(db_path)
-        self.cur = self.con.cursor()
-
-        if not db_path.exists():
-            logging.warning(f"Benchmark database did not exist, creating...")
-            self._create_tables()
+        self._create_tables()
 
     def _create_tables(self):
-        self.cur.execute(
-            "CREATE TABLE files(file_hash TEXT PRIMARY KEY NOT NULL, path TEXT NOT NULL, name TEXT NOT NULL)")
-        self.cur.execute("CREATE TABLE tag_types(tag_id INT PRIMARY KEY NOT NULL, tag_name TEXT NOT NULL)")
-        self.cur.execute(
-            "CREATE TABLE file_tags(file_hash REFERENCES files(file_hash), tag_id REFERENCES tag_types(tag_id))")
+        self.con.execute(
+            """CREATE TABLE IF NOT EXISTS files(
+                file_hash TEXT PRIMARY KEY NOT NULL, 
+                path TEXT NOT NULL, 
+                name TEXT NOT NULL
+            )""")
+        self.con.execute(
+            """CREATE TABLE IF NOT EXISTS compressors(
+                compressor_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
+                name TEXT NOT NULL UNIQUE
+            )""")
+        # self.cur.execute("CREATE TABLE tag_types(tag_id INT PRIMARY KEY NOT NULL, tag_name TEXT NOT NULL)")
+        # self.cur.execute(
+        #     "CREATE TABLE file_tags(file_hash REFERENCES files(file_hash), tag_id REFERENCES tag_types(tag_id))")
+        self.con.execute(
+            """CREATE TABLE IF NOT EXISTS file_ratios(
+                file_hash REFERENCES files(file_hash), 
+                compressor_id REFERENCES compressors(compressor_id), 
+                ratio FLOAT
+                )""")
         self.con.commit()
 
-    def update_file(self, file: InputFile):
+    def update_compressors(self, compressor_list: [str]):
         try:
-            self.cur.execute(
-                "INSERT INTO files VALUES(:hash, :path, :name)"
-                "   ON CONFLICT(file_hash) DO UPDATE SET "
-                "       path = :path, "
-                "       name = :name",
-                file)
+            compressors = [(c,) for c in compressor_list]
+            self.con.executemany("INSERT OR IGNORE INTO compressors(name) VALUES(?)", compressors)
             self.con.commit()
         except sqlite3.Error as e:
             logging.exception(e)
+
+    def update_file(self, file: InputFile):
+        try:
+            self.con.execute(
+                """INSERT INTO files VALUES(:hash, :path, :name)
+                 ON CONFLICT(file_hash) 
+                     DO UPDATE SET 
+                        path = :path, 
+                        name = :name""",
+                file
+            )
+            self.con.commit()
+        except sqlite3.Error as e:
+            logging.exception(e)
+
+    def get_all_files(self):
+        return [InputFile(*row) for row in self.con.execute("SELECT file_hash, path, name FROM files").fetchall()]
+
+    def get_ratios_for_file(self, file_hash: str):
+        return [Ratio(*row) for row in
+                self.con.execute("SELECT * FROM files WHERE file_hash = ?", (file_hash,)).fetchall()]

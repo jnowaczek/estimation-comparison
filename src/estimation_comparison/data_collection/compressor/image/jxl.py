@@ -12,8 +12,7 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import numpy as np
-from imagecodecs import tiff_decode, jpegxl_encode
+from imagecodecs import tiff_decode, jpegxl_encode, tiff_check
 
 from typing import Dict
 
@@ -21,9 +20,12 @@ from estimation_comparison.data_collection.compressor.image.base import ImageCom
 
 
 class JpegXlCompressor(ImageCompressorBase):
-    def __init__(self, parameters: Dict[str, any]):
-        super().__init__(parameters)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def compress(self, data: bytes) -> bytes:
+        if not tiff_check(data):
+            raise ValueError("Input must be tiff")
+
         nda = tiff_decode(data)
-        return jpegxl_encode(nda, lossless=True)
+        return jpegxl_encode(nda, lossless=self.lossless)

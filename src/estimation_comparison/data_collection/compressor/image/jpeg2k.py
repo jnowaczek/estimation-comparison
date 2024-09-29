@@ -12,26 +12,20 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import abc
-from typing import Dict
+from imagecodecs import tiff_decode, jpeg2k_encode, tiff_check
 
-import numpy as np
+from estimation_comparison.data_collection.compressor.image.base import ImageCompressorBase
 
 
-class ImageCompressorBase:
-    parameters: Dict[str, any]
-
-    @abc.abstractmethod
+class Jpeg2kCompressor(ImageCompressorBase):
     def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            setattr(self, key, value)
+        super().__init__(**kwargs)
+        if self.lossless:
+            self.level = 0
 
-    @abc.abstractmethod
-    def compress(self, data: np.ndarray) -> bytes:
-        pass
+    def compress(self, data: bytes) -> bytes:
+        if not tiff_check(data):
+            raise ValueError("Input must be tiff")
 
-    def ratio(self, data: np.ndarray) -> float:
-        return len(data) / len(self.compress(data))
-
-    def run(self, data: np.ndarray) -> float:
-        return self.ratio(data)
+        nda = tiff_decode(data)
+        return jpeg2k_encode(nda, level=self.level, reversible=self.lossless)

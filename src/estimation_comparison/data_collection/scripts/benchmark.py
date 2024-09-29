@@ -30,7 +30,12 @@ from typing import List, Dict
 
 import numpy as np
 
+from estimation_comparison.data_collection.compressor.general.gzip import GzipCompressor
+from estimation_comparison.data_collection.compressor.general.lzma import LzmaCompressor
+from estimation_comparison.data_collection.compressor.image.jpeg import JpegCompressor
+from estimation_comparison.data_collection.compressor.image.jpeg2k import Jpeg2kCompressor
 from estimation_comparison.data_collection.compressor.image.jxl import JpegXlCompressor
+from estimation_comparison.data_collection.compressor.image.png import PngCompressor
 from estimation_comparison.data_collection.database import BenchmarkDatabase, InputFile
 from estimation_comparison.data_collection.estimator import Autocorrelation, ByteCount, Entropy
 from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch, proportion_below_cutoff, \
@@ -88,7 +93,13 @@ class Benchmark:
             # "entropy_bits": Entropy({"base": 2}),
         }
         self._compressors = {
-            "jxl": JpegXlCompressor({}),
+            "gzip_9": GzipCompressor({"level": 9}),
+            "jxl_lossless": JpegXlCompressor(lossless=True),
+            "jpeg": JpegCompressor(),
+            "jpeg2k": Jpeg2kCompressor(lossless=False),
+            "jpeg2k_lossless": Jpeg2kCompressor(lossless=True),
+            "lzma": LzmaCompressor({}),
+            "png": PngCompressor(),
         }
         self.algorithms = self._estimators | self._compressors
 
@@ -97,10 +108,14 @@ class Benchmark:
         else:
             self.process_pool = None
 
+    @staticmethod
+    def _hash_file(p: Path) -> str:
+        with open(p, "rb") as f:
+            return hashlib.file_digest(f, hashlib.sha256).hexdigest()
+
     def update_database(self, locations: List[str]):
-        def _hash_file(p: Path) -> str:
-            with open(p, "rb") as f:
-                return hashlib.file_digest(f, hashlib.sha256).hexdigest()
+        logging.info("Updating benchmark database compressor list")
+        self.database.update_compressors(self._compressors.keys())
 
         logging.info("Updating benchmark database file list")
         hash_tasks = []
@@ -111,12 +126,12 @@ class Benchmark:
             logging.debug(f"Entering directory '{path}'")
             for file in filter(lambda f: f.is_file(), path.glob("**/*")):
                 if self.process_pool is not None:
-                    future = self.process_pool.submit(_hash_file, file)
+                    future = self.process_pool.submit(self._hash_file, file)
                     future.context = (str(file), os.path.relpath(file, path))
                     hash_tasks.append(future)
                 else:
                     self.file_list.append(
-                        InputFile(_hash_file(file), str(file),
+                        InputFile(self._hash_file(file), str(file),
                                   os.path.relpath(file, path)))
                     logging.debug(f"Adding file '{file}'")
 
@@ -125,7 +140,34 @@ class Benchmark:
                 self.database.update_file(
                     InputFile(future.result(), future.context[0], future.context[1]))
 
+    @staticmethod
+    def _ratio_file(algorithm, p: Path) -> str:
+        with open(p, "rb") as f:
+            return algorithm.run(f.read())
+
+    def update_ratio_database(self) -> int:
+        ratio_tasks = []
+
+        # Glob 'em, hash 'em, and INSERT 'em
+        for f in self.database.get_all_files():
+            ratios: {str: float} = {x.algorithm: x.ratio for x in self.database.get_ratios_for_file(f.hash)}
+
+            for alg in self._compressors:
+                if alg not in ratios.keys():
+                    future = self.process_pool.submit(self._ratio_file, f.path)
+                    future.context = f.hash
+                    ratio_tasks.append(future)
+
+            for future in concurrent.futures.as_completed(ratio_tasks):
+                self.database.update_file(
+                    InputFile(future.result(), future.context[0], future.context[1]))
+        return len(ratio_tasks)
+
     def run(self):
+        ratio_start_time = default_timer()
+        updates = self.update_ratio_database()
+        logging.info(f"Calculated {updates} compression ratios in {default_timer() - ratio_start_time:.3f} seconds")
+
         start_time = default_timer()
         num_tasks = len(self.file_list) * len(self.algorithms.values())
         completed_tasks = 0

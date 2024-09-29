@@ -12,26 +12,20 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import abc
+from imagecodecs import tiff_decode, spng_encode, tiff_check
+
 from typing import Dict
 
-import numpy as np
+from estimation_comparison.data_collection.compressor.image.base import ImageCompressorBase
 
 
-class ImageCompressorBase:
-    parameters: Dict[str, any]
-
-    @abc.abstractmethod
+class PngCompressor(ImageCompressorBase):
     def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            setattr(self, key, value)
+        super().__init__(**kwargs)
 
-    @abc.abstractmethod
-    def compress(self, data: np.ndarray) -> bytes:
-        pass
+    def compress(self, data: bytes) -> bytes:
+        if not tiff_check(data):
+            raise ValueError("Input must be tiff")
 
-    def ratio(self, data: np.ndarray) -> float:
-        return len(data) / len(self.compress(data))
-
-    def run(self, data: np.ndarray) -> float:
-        return self.ratio(data)
+        nda = tiff_decode(data)
+        return spng_encode(nda)
