@@ -36,77 +36,71 @@ from estimation_comparison.data_collection.compressor.image.jpeg import JpegComp
 from estimation_comparison.data_collection.compressor.image.jpeg2k import Jpeg2kCompressor
 from estimation_comparison.data_collection.compressor.image.jxl import JpegXlCompressor
 from estimation_comparison.data_collection.compressor.image.png import PngCompressor
-from estimation_comparison.data_collection.database import BenchmarkDatabase, InputFile
+from estimation_comparison.data_collection.database import BenchmarkDatabase, InputFile, Ratio
 from estimation_comparison.data_collection.estimator import Autocorrelation, ByteCount, Entropy
 from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch, proportion_below_cutoff, \
     max_below_cutoff
 
 
 class Benchmark:
-    def __init__(self, output_dir: str, workers: int | None, parallel=False):
-        self.results: Dict = {}
+    def __init__(self, output_dir: str, workers: int | None):
         self.output_dir = output_dir
-        self.file_list: List[InputFile] = []
         self.database = BenchmarkDatabase(Path(self.output_dir) / "benchmark.sqlite")
         self._estimators = {
             "autocorrelation_1k_64_notch_mean": Autocorrelation(
                 {"block_size": 67108864,
                  "block_summary_function": functools.partial(max_outside_middle_notch, notch_width=32768),
                  "file_summary_function": np.mean}),
-            # "autocorrelation_1k_64_notch_max": Autocorrelation(
-            #     {"block_size": 1024,
-            #      "block_summary_function": functools.partial(max_outside_middle_notch, notch_width=64),
-            #      "file_summary_function": np.max}),
-            # "autocorrelation_1k_768_cutoff_mean": Autocorrelation(
-            #     {"block_size": 1024,
-            #      "block_summary_function": functools.partial(proportion_below_cutoff, cutoff=768),
-            #      "file_summary_function": np.mean}),
-            # "autocorrelation_1k_896_cutoff_mean": Autocorrelation(
-            #     {"block_size": 1024,
-            #      "block_summary_function": functools.partial(proportion_below_cutoff, cutoff=896),
-            #      "file_summary_function": np.mean}),
-            # "autocorrelation_1k_768_cutoff_max": Autocorrelation(
-            #     {"block_size": 1024,
-            #      "block_summary_function": functools.partial(proportion_below_cutoff, cutoff=768),
-            #      "file_summary_function": np.max}),
-            # "autocorrelation_1k_896_cutoff_max": Autocorrelation(
-            #     {"block_size": 1024,
-            #      "block_summary_function": functools.partial(max_below_cutoff, cutoff=896),
-            #      "file_summary_function": np.max}),
-            # "autocorrelation_1k_768_cutoff_max_mean": Autocorrelation(
-            #     {"block_size": 1024,
-            #      "block_summary_function": functools.partial(max_below_cutoff, cutoff=768),
-            #      "file_summary_function": np.mean}),
-            # "autocorrelation_1k_896_cutoff_max_mean": Autocorrelation(
-            #     {"block_size": 1024,
-            #      "block_summary_function": functools.partial(max_below_cutoff, cutoff=896),
-            #      "file_summary_function": np.mean}),
-            # "autocorrelation_1k_768_cutoff_max_max": Autocorrelation(
-            #     {"block_size": 1024,
-            #      "block_summary_function": functools.partial(max_below_cutoff, cutoff=768),
-            #      "file_summary_function": np.max}),
-            # "autocorrelation_1k_896_cutoff_max_max": Autocorrelation(
-            #     {"block_size": 1024,
-            #      "block_summary_function": functools.partial(max_below_cutoff, cutoff=896),
-            #      "file_summary_function": np.max}),
-            # "bytecount_file": ByteCount({"block_size": None}),
-            # "entropy_bits": Entropy({"base": 2}),
+            "autocorrelation_1k_64_notch_max": Autocorrelation(
+                {"block_size": 1024,
+                 "block_summary_function": functools.partial(max_outside_middle_notch, notch_width=64),
+                 "file_summary_function": np.max}),
+            "autocorrelation_1k_768_cutoff_mean": Autocorrelation(
+                {"block_size": 1024,
+                 "block_summary_function": functools.partial(proportion_below_cutoff, cutoff=768),
+                 "file_summary_function": np.mean}),
+            "autocorrelation_1k_896_cutoff_mean": Autocorrelation(
+                {"block_size": 1024,
+                 "block_summary_function": functools.partial(proportion_below_cutoff, cutoff=896),
+                 "file_summary_function": np.mean}),
+            "autocorrelation_1k_768_cutoff_max": Autocorrelation(
+                {"block_size": 1024,
+                 "block_summary_function": functools.partial(proportion_below_cutoff, cutoff=768),
+                 "file_summary_function": np.max}),
+            "autocorrelation_1k_896_cutoff_max": Autocorrelation(
+                {"block_size": 1024,
+                 "block_summary_function": functools.partial(max_below_cutoff, cutoff=896),
+                 "file_summary_function": np.max}),
+            "autocorrelation_1k_768_cutoff_max_mean": Autocorrelation(
+                {"block_size": 1024,
+                 "block_summary_function": functools.partial(max_below_cutoff, cutoff=768),
+                 "file_summary_function": np.mean}),
+            "autocorrelation_1k_896_cutoff_max_mean": Autocorrelation(
+                {"block_size": 1024,
+                 "block_summary_function": functools.partial(max_below_cutoff, cutoff=896),
+                 "file_summary_function": np.mean}),
+            "autocorrelation_1k_768_cutoff_max_max": Autocorrelation(
+                {"block_size": 1024,
+                 "block_summary_function": functools.partial(max_below_cutoff, cutoff=768),
+                 "file_summary_function": np.max}),
+            "autocorrelation_1k_896_cutoff_max_max": Autocorrelation(
+                {"block_size": 1024,
+                 "block_summary_function": functools.partial(max_below_cutoff, cutoff=896),
+                 "file_summary_function": np.max}),
+            "bytecount_file": ByteCount({"block_size": None}),
+            "entropy_bits": Entropy({"base": 2}),
         }
         self._compressors = {
             "gzip_9": GzipCompressor({"level": 9}),
             "jxl_lossless": JpegXlCompressor(lossless=True),
             "jpeg": JpegCompressor(),
-            "jpeg2k": Jpeg2kCompressor(lossless=False),
+            "jpeg2k": Jpeg2kCompressor(lossless=False, level=90),
             "jpeg2k_lossless": Jpeg2kCompressor(lossless=True),
             "lzma": LzmaCompressor({}),
             "png": PngCompressor(),
         }
-        self.algorithms = self._estimators | self._compressors
 
-        if parallel:
-            self.process_pool = ProcessPoolExecutor(max_workers=workers)
-        else:
-            self.process_pool = None
+        self.process_pool = ProcessPoolExecutor(max_workers=workers)
 
     @staticmethod
     def _hash_file(p: Path) -> str:
@@ -125,91 +119,83 @@ class Benchmark:
             path = Path(s)
             logging.debug(f"Entering directory '{path}'")
             for file in filter(lambda f: f.is_file(), path.glob("**/*")):
-                if self.process_pool is not None:
-                    future = self.process_pool.submit(self._hash_file, file)
-                    future.context = (str(file), os.path.relpath(file, path))
-                    hash_tasks.append(future)
-                else:
-                    self.file_list.append(
-                        InputFile(self._hash_file(file), str(file),
-                                  os.path.relpath(file, path)))
-                    logging.debug(f"Adding file '{file}'")
+                future = self.process_pool.submit(self._hash_file, file)
+                future.context = (str(file), os.path.relpath(file, path))
+                hash_tasks.append(future)
 
-        if self.process_pool is not None:
-            for future in concurrent.futures.as_completed(hash_tasks):
-                self.database.update_file(
-                    InputFile(future.result(), future.context[0], future.context[1]))
+        for future in concurrent.futures.as_completed(hash_tasks):
+            self.database.update_file(
+                InputFile(future.result(), future.context[0], future.context[1]))
 
     @staticmethod
     def _ratio_file(algorithm, p: Path) -> str:
-        with open(p, "rb") as f:
-            return algorithm.run(f.read())
+        try:
+            with open(p, "rb") as f:
+                return algorithm.run(f.read())
+        except ValueError as e:
+            logging.warning(e)
 
     def update_ratio_database(self) -> int:
         ratio_tasks = []
+        submitted_ratio_tasks = 0
+        completed_ratio_tasks = 0
 
-        # Glob 'em, hash 'em, and INSERT 'em
         for f in self.database.get_all_files():
             ratios: {str: float} = {x.algorithm: x.ratio for x in self.database.get_ratios_for_file(f.hash)}
 
-            for alg in self._compressors:
-                if alg not in ratios.keys():
-                    future = self.process_pool.submit(self._ratio_file, f.path)
-                    future.context = f.hash
+            for name, instance in self._compressors.items():
+                if name not in ratios.keys():
+                    future = self.process_pool.submit(self._ratio_file, instance, f.path)
+                    future.context = {"hash": f.hash, "compressor_name": name}
                     ratio_tasks.append(future)
+                    submitted_ratio_tasks += 1
 
-            for future in concurrent.futures.as_completed(ratio_tasks):
-                self.database.update_file(
-                    InputFile(future.result(), future.context[0], future.context[1]))
+        for future in concurrent.futures.as_completed(ratio_tasks):
+            self.database.update_ratio(
+                Ratio(future.context["hash"], future.context["compressor_name"], future.result()))
+            completed_ratio_tasks += 1
+            logging.info(
+                f"{completed_ratio_tasks}/{submitted_ratio_tasks} tasks complete, {completed_ratio_tasks / submitted_ratio_tasks * 100:.2f}%")
+
         return len(ratio_tasks)
 
-    def run(self):
+    def run_estimators(self):
         ratio_start_time = default_timer()
         updates = self.update_ratio_database()
         logging.info(f"Calculated {updates} compression ratios in {default_timer() - ratio_start_time:.3f} seconds")
 
         start_time = default_timer()
-        num_tasks = len(self.file_list) * len(self.algorithms.values())
+        num_tasks = self.database.input_file_count * len(self._estimators.values())
         completed_tasks = 0
 
         tasks = []
-        for file in self.file_list:
+        for file in self.database.get_all_files():
             try:
                 with open(file.path, "rb") as f:
                     data = f.read()
             except OSError as e:
                 logging.exception(f"Error reading data file '{file.path}': {e}")
 
-            for instance_name, instance in self.algorithms.items():
+            for instance_name, instance in self._estimators.items():
                 try:
-                    if self.process_pool is not None:
-                        future = self.process_pool.submit(instance.run, data)
-                        future.context = (instance_name, instance, file)
-                        tasks.append(future)
-                    else:
-                        result = instance.run(data)
-                        self.results[file.name] |= {f"{instance_name} Parameters": instance.parameters,
-                                                    f"{instance_name}": result}
-                        completed_tasks += 1
-                        logging.info(
-                            f"{completed_tasks}/{num_tasks} tasks complete, {completed_tasks / num_tasks * 100:.2f}%")
-
+                    future = self.process_pool.submit(instance.run, data)
+                    future.context = {"estimator_name": instance_name, "estimator_instance": instance, "file": file}
+                    tasks.append(future)
                 except Exception as e:
                     logging.exception(f"Input file '{file.name}' raised exception\n\t{e})")
 
-        if self.process_pool is not None:
-            for future in concurrent.futures.as_completed(tasks):
-                completed_tasks += 1
-                logging.info(f"{completed_tasks}/{num_tasks} tasks complete, {completed_tasks / num_tasks * 100:.2f}%")
-                try:
-                    self.results[future.context[2].name] |= {
-                        f"{future.context[0]} Parameters": future.context[1].parameters,
-                        f"{future.context[0]}": future.result()}
-                except Exception as e:
-                    logging.exception(f"Input file '{future.context[2].name}' raised exception\n\t{e}")
-                finally:
-                    del future
-            self.process_pool.shutdown()
+        for future in concurrent.futures.as_completed(tasks):
+            completed_tasks += 1
+            logging.info(f"{completed_tasks}/{num_tasks} tasks complete, {completed_tasks / num_tasks * 100:.2f}%")
+            try:
+                self.results[future.context["file"].name] |= {
+                    f"{future.context["estimator_name"]} Parameters": future.context["estimator_instance"].parameters,
+                    f"{future.context["estimator_name"]}": future.result()}
+            except Exception as e:
+                logging.exception(f"Input file '{future.context["file"].name}' raised exception\n\t{e}")
+            finally:
+                del future
+        self.process_pool.shutdown()
 
         logging.info(f"Benchmark completed in {default_timer() - start_time:.3f} seconds")
 
@@ -223,7 +209,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("dir", action="append")
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true")
-    parser.add_argument("-p", "--parallel", dest="parallel", action="store_true")
     parser.add_argument("-w", "--workers", type=int, dest="workers", default=None)
     parser.add_argument("-l", "--limit-files", type=int, dest="file_limit", default=0)
     parser.add_argument("-o", "--output_dir", type=str, dest="output_dir", default="./benchmarks")
@@ -231,10 +216,10 @@ def main():
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
 
-    benchmark = Benchmark(args.output_dir, workers=args.workers, parallel=args.parallel)
+    benchmark = Benchmark(args.output_dir, workers=args.workers)
     benchmark.update_database(args.dir)
 
-    benchmark.run()
+    benchmark.run_estimators()
 
 
 if __name__ == "__main__":

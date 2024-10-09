@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 InputFile = NamedTuple("InputFile", [("hash", str), ("path", str), ("name", str)])
-Ratio = NamedTuple("Ratio", [("algorithm", str), ("ratio", float)])
+Ratio = NamedTuple("Ratio", [("hash", str), ("algorithm", str), ("ratio", float)])
 
 
 class BenchmarkDatabase:
@@ -33,20 +33,22 @@ class BenchmarkDatabase:
                 path TEXT NOT NULL, 
                 name TEXT NOT NULL
             )""")
+        self.con.commit()
         self.con.execute(
             """CREATE TABLE IF NOT EXISTS compressors(
                 compressor_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
                 name TEXT NOT NULL UNIQUE
             )""")
+        self.con.commit()
         # self.cur.execute("CREATE TABLE tag_types(tag_id INT PRIMARY KEY NOT NULL, tag_name TEXT NOT NULL)")
         # self.cur.execute(
         #     "CREATE TABLE file_tags(file_hash REFERENCES files(file_hash), tag_id REFERENCES tag_types(tag_id))")
         self.con.execute(
             """CREATE TABLE IF NOT EXISTS file_ratios(
-                file_hash REFERENCES files(file_hash), 
-                compressor_id REFERENCES compressors(compressor_id), 
+                file_hash REFERENCES files(file_hash) NOT NULL, 
+                compressor_id REFERENCES compressors(compressor_id) NOT NULL, 
                 ratio FLOAT
-                )""")
+            )""")
         self.con.commit()
 
     def update_compressors(self, compressor_list: [str]):
@@ -71,9 +73,30 @@ class BenchmarkDatabase:
         except sqlite3.Error as e:
             logging.exception(e)
 
+    def update_ratio(self, new_ratio: Ratio):
+        try:
+            self.con.execute(
+                """INSERT INTO file_ratios VALUES(:hash, (SELECT compressor_id FROM compressors WHERE name=:compressor_name), :ratio)""",
+                new_ratio
+            )
+            self.con.commit()
+        except sqlite3.Error as e:
+            logging.exception(e)
+
     def get_all_files(self):
         return [InputFile(*row) for row in self.con.execute("SELECT file_hash, path, name FROM files").fetchall()]
 
-    def get_ratios_for_file(self, file_hash: str):
-        return [Ratio(*row) for row in
-                self.con.execute("SELECT * FROM files WHERE file_hash = ?", (file_hash,)).fetchall()]
+    @property
+    def input_file_count(self) -> int:
+        return self.con.execute("SELECT COUNT(*) FROM files").fetchone()[0]
+
+    def get_ratios_for_file(self, hash: str):
+        ratios = []
+        for row in self.con.execute(
+                """SELECT file_hash,
+                 (SELECT name FROM compressors WHERE file_ratios.compressor_id=compressors.compressor_id),
+                 ratio
+                 FROM file_ratios WHERE file_hash = ?""",
+                (hash,)).fetchall():
+            ratios.append(Ratio(*row))
+        return ratios
