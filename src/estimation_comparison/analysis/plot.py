@@ -17,6 +17,7 @@ import logging
 
 import bokeh.colors.util
 import numpy as np
+import pandas as pd
 import scipy
 from bokeh.models import ColumnDataSource, FactorRange, HoverTool, Label
 from bokeh.palettes import Category20
@@ -26,8 +27,9 @@ from pandas import DataFrame
 
 
 class PlotHandler:
-    def __init__(self, df: DataFrame):
-        self._data = df
+    def __init__(self, x: DataFrame, y: DataFrame):
+        self._x = x
+        self._y = y
         self.palette = Category20[20]
 
     def individual_plot(self, algorithm: str) -> any:
@@ -41,23 +43,20 @@ class PlotHandler:
                 logging.error(f"Unable to plot unknown estimator: {algorithm}")
                 return None
 
-    def ratio_plot(self, x_axis: str, algorithms: [str]) -> any:
-        subset = self._data[[*algorithms, x_axis]]
-        datasource = ColumnDataSource(subset)
-        plot = figure(title=f"{x_axis} Compression Ratio vs Estimator Metric", sizing_mode="stretch_both",
-                      tooltips=[("Estimator", "$name"), ("Metric", "$snap_y"), ("File name", "@index")])
-        for y, color in zip(algorithms, self.palette):
-            plot.scatter(
-                x_axis,
-                y,
-                source=datasource,
-                color=color,
-                legend_label=y,
-                name=y
-            )
-        plot.xaxis.axis_label = f"{x_axis} Compression Ratio"
-        plot.yaxis.axis_label = f"Estimator Metric"
-        plot.legend.location = "top_left"
+    def ratio_plot(self, x, y) -> any:
+        a = self._y.iloc[self._y.groupby("estimator").indices[y]].drop("estimator", axis=1)
+        b = self._x.iloc[self._x.groupby("compressor").indices[x]].drop("compressor", axis=1)
+        cds = ColumnDataSource(pd.merge(a, b, how="left", on="filename"))
+        plot = figure(title=f"{x} Compression Ratio vs {y} Metric", sizing_mode="stretch_both",
+                      tooltips=[("Estimator", "$name"), ("Metric", "$snap_y"), ("File name", "@filename")])
+        plot.scatter(
+            x="ratio",
+            y="metric",
+            source=cds,
+            name=y
+        )
+        plot.xaxis.axis_label = f"{x} Compression Ratio"
+        plot.yaxis.axis_label = f"{y} Metric"
         return plot
 
     def line_plot_all_files(self, algorithm: str) -> any:

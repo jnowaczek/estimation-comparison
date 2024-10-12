@@ -18,15 +18,11 @@ import hashlib
 import logging
 import os
 import pickle
-import random
 from concurrent.futures import ProcessPoolExecutor
 import functools
-from dataclasses import dataclass
-from datetime import datetime
-from multiprocessing.managers import SharedMemoryManager
 from timeit import default_timer
 from pathlib import Path
-from typing import List, Dict
+from typing import List
 
 import numpy as np
 
@@ -36,7 +32,7 @@ from estimation_comparison.data_collection.compressor.image.jpeg import JpegComp
 from estimation_comparison.data_collection.compressor.image.jpeg2k import Jpeg2kCompressor
 from estimation_comparison.data_collection.compressor.image.jxl import JpegXlCompressor
 from estimation_comparison.data_collection.compressor.image.png import PngCompressor
-from estimation_comparison.data_collection.database import BenchmarkDatabase, InputFile, Ratio
+from estimation_comparison.database import BenchmarkDatabase, InputFile, Ratio, Metric
 from estimation_comparison.data_collection.estimator import Autocorrelation, ByteCount, Entropy
 from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch, proportion_below_cutoff, \
     max_below_cutoff
@@ -44,6 +40,7 @@ from estimation_comparison.data_collection.summary_stats import max_outside_midd
 
 class Benchmark:
     def __init__(self, output_dir: str, workers: int | None):
+        self._init_time = default_timer()
         self.output_dir = output_dir
         self.database = BenchmarkDatabase(Path(self.output_dir) / "benchmark.sqlite")
         self._estimators = {
@@ -110,6 +107,8 @@ class Benchmark:
     def update_database(self, locations: List[str]):
         logging.info("Updating benchmark database compressor list")
         self.database.update_compressors(self._compressors.keys())
+        logging.info("Updating benchmark database estimator list")
+        self.database.update_estimators(self._estimators)
 
         logging.info("Updating benchmark database file list")
         hash_tasks = []
@@ -159,7 +158,15 @@ class Benchmark:
 
         return len(ratio_tasks)
 
-    def run_estimators(self):
+    @staticmethod
+    def _run_estimator(instance, file: InputFile):
+        try:
+            with open(file.path, "rb") as f:
+                instance.run(f.read())
+        except OSError as e:
+            logging.exception(f"Error reading data file '{file.path}': {e}")
+
+    def run(self):
         ratio_start_time = default_timer()
         updates = self.update_ratio_database()
         logging.info(f"Calculated {updates} compression ratios in {default_timer() - ratio_start_time:.3f} seconds")
@@ -170,15 +177,9 @@ class Benchmark:
 
         tasks = []
         for file in self.database.get_all_files():
-            try:
-                with open(file.path, "rb") as f:
-                    data = f.read()
-            except OSError as e:
-                logging.exception(f"Error reading data file '{file.path}': {e}")
-
             for instance_name, instance in self._estimators.items():
                 try:
-                    future = self.process_pool.submit(instance.run, data)
+                    future = self.process_pool.submit(self._run_estimator, instance, file)
                     future.context = {"estimator_name": instance_name, "estimator_instance": instance, "file": file}
                     tasks.append(future)
                 except Exception as e:
@@ -186,23 +187,23 @@ class Benchmark:
 
         for future in concurrent.futures.as_completed(tasks):
             completed_tasks += 1
-            logging.info(f"{completed_tasks}/{num_tasks} tasks complete, {completed_tasks / num_tasks * 100:.2f}%")
+            logging.info(
+                f"{completed_tasks}/{num_tasks} estimation tasks complete, {completed_tasks / num_tasks * 100:.2f}%")
             try:
-                self.results[future.context["file"].name] |= {
-                    f"{future.context["estimator_name"]} Parameters": future.context["estimator_instance"].parameters,
-                    f"{future.context["estimator_name"]}": future.result()}
+                self.database.update_metric(
+                    Metric(future.context["file"].hash, future.context["estimator_name"],
+                           pickle.dumps(future.result(), pickle.HIGHEST_PROTOCOL)))
+                # self.results[future.context["file"].name] |= {
+                #     f"{future.context["estimator_name"]} Parameters": future.context["estimator_instance"].parameters,
+                #     f"{future.context["estimator_name"]}": future.result()}
             except Exception as e:
                 logging.exception(f"Input file '{future.context["file"].name}' raised exception\n\t{e}")
             finally:
                 del future
         self.process_pool.shutdown()
 
-        logging.info(f"Benchmark completed in {default_timer() - start_time:.3f} seconds")
-
-        output_file = f"{self.output_dir}/benchmark_{datetime.now().isoformat()}.pkl"
-        with open(output_file, "wb") as f:
-            pickle.dump(self.results, f)
-            logging.info(f"Results written to '{output_file}'")
+        logging.info(f"Estimation completed in {default_timer() - start_time:.3f} seconds")
+        logging.info(f"Benchmark completed in {default_timer() - self._init_time:.3f} seconds")
 
 
 def main():
@@ -219,7 +220,7 @@ def main():
     benchmark = Benchmark(args.output_dir, workers=args.workers)
     benchmark.update_database(args.dir)
 
-    benchmark.run_estimators()
+    benchmark.run()
 
 
 if __name__ == "__main__":

@@ -25,11 +25,12 @@ import pandas as pd
 from bokeh.io import save
 
 from estimation_comparison.analysis.plot import PlotHandler
+from estimation_comparison.database import BenchmarkDatabase
 
 
 class Analyze:
     def __init__(self, output_dir: str, workers: int | None, parallel=False):
-        self.raw_data = None
+        self.database: BenchmarkDatabase = None
         self.data: pd.DataFrame | None = None
         self.output_dir = output_dir
         self.workers = workers
@@ -40,68 +41,39 @@ class Analyze:
         else:
             self.process_pool = None
 
-    def _create_dataframe(self):
-        """
-        Create a pandas dataframe with the following structure:
-
-        +-------+-------+-------+-----------+
-        |       | Algo1 | Algo2 | Algo3     |
-        +=======+=======+=======+===========+
-        | File1 | 1     | [1]   | [[1],[1]] |
-        +-------+-------+-------+-----------+
-        | File2 | 2     | [2]   | [[2],[2]] |
-        +-------+-------+-------+-----------+
-        | File3 | 3     | [3]   | [[3],[3]] |
-        +-------+-------+-------+-----------+
-
-        :return:
-        """
-        self.data = pd.DataFrame.from_dict(self.raw_data, orient='index')
-        logging.info(f"Loaded {self.data.shape} dataframe")
+    def _create_dataframes(self):
+        # self.ratios = pd.DataFrame().from_records(self.database.get_all_ratios(),
+        #                                           columns=["filename", "compressor", "ratio"])
+        # self.metrics = pd.DataFrame().from_records(self.database.get_all_metric(),
+        #                                            columns=["filename", "estimator", "metric"])
+        description, records = self.database.get_dataframe()
+        self.data = pd.DataFrame().from_records(records, columns=description)
+        print(self.data.head())
 
     def load(self, filename: Path):
         suffix = filename.suffix
         match suffix:
             case ".pkl":
-                self.raw_data = pickle.load(open(filename, "rb"))
+                raise ValueError(f"Pickle files not supported in this version: {suffix}")
+            case ".sqlite":
+                self.database = BenchmarkDatabase(filename)
             case _:
                 raise ValueError(f"Unsupported file type: {suffix}")
         logging.info(f"Loaded '{filename}'")
-        self._create_dataframe()
-        self.plot_handler = PlotHandler(self.data)
+        self._create_dataframes()
+        self.plot_handler = PlotHandler(self.ratios, self.metrics)
 
     def run(self):
-        for algorithm in filter(lambda x: "Parameters" not in x, self.data.columns):
-            print(f"{algorithm}: {self.data[algorithm].corr(self.data['jxl'])}")
-
         plots = {}
 
-        for algorithm in self.data.columns:
-            plots[algorithm] = self.plot_handler.individual_plot(algorithm)
+        for compressor in self.ratios["compressor"].unique():
+            for estimator in self.metrics["estimator"].unique():
+                plots[(compressor, estimator)] = self.plot_handler.ratio_plot(compressor, estimator)
+                break
+            break
 
-
-        # plots["compression_ratio_jxl"] = self.plot_handler.ratio_plot("jxl",
-        #                                                               algorithms=[  # "entropy_bits",
-        #                                                                   # "bytecount_file",
-        #                                                                   "autocorrelation_1k_768_cutoff_mean",
-        #                                                                   "autocorrelation_1k_768_cutoff_max",
-        #                                                                   "autocorrelation_1k_64_notch_mean",
-        #                                                                   "autocorrelation_1k_896_cutoff_max_max",
-        #                                                                   "autocorrelation_1k_768_cutoff_max_mean",
-        #                                                                   "autocorrelation_1k_896_cutoff_mean",
-        #                                                                   "autocorrelation_1k_768_cutoff_max_max",
-        #                                                                   "autocorrelation_1k_896_cutoff_max",
-        #                                                                   "autocorrelation_1k_64_notch_max",
-        #                                                                   "autocorrelation_1k_768_cutoff_mean",
-        #                                                                   "autocorrelation_1k_896_cutoff_max_mean",
-        #                                                               ]
-        #                                                               )
-        plots["compression_ratio_jxl_single"] = self.plot_handler.ratio_plot("jxl",
-                                                                      algorithms=[  # "entropy_bits",
-                                                                          # "bytecount_file",
-                                                                          "autocorrelation_1k_64_notch_mean",
-                                                                      ]
-                                                                      )
+        # for algorithm in filter(lambda x: "Parameters" not in x, self.data.columns):
+        #     print(f"{algorithm}: {self.data[algorithm].corr(self.data['jxl'])}")
 
         save_time = datetime.now().isoformat(timespec="seconds")
         for name, p in plots.items():
@@ -135,6 +107,6 @@ if __name__ == "__main__":
     if args.file is not None:
         analyze.load(args.file)
     else:
-        analyze.load(sorted(args.input_dir.glob("benchmark*"))[-1])
+        analyze.load(args.input_dir / "benchmark.sqlite")
 
     analyze.run()
