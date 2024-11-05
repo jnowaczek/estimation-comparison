@@ -12,18 +12,11 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from typing import Dict
 import lzma
 
 from estimation_comparison.data_collection.compressor.general.base import GeneralCompressorBase
 
 
 class LzmaCompressor(GeneralCompressorBase):
-    def __init__(self, parameters: Dict[str, any]):
-        for parameter in []:
-            if parameter not in parameters:
-                raise ValueError(f"Missing required parameter: '{parameter}'")
-        super().__init__(parameters)
-
     def compress(self, data: bytes) -> bytes:
         return lzma.compress(data)

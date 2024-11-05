@@ -17,20 +17,19 @@ from typing import Dict
 
 import numpy as np
 import scipy.signal as signal
+from traitlets import Callable, Int
 
-from estimation_comparison.data_collection.estimator.estimator_base import EstimatorBase
+from estimation_comparison.data_collection.estimator.base import EstimatorBase
 
 
 class Autocorrelation(EstimatorBase):
-    def __init__(self, parameters: Dict[str, any]):
-        for parameter in ["block_size", "block_summary_function", "file_summary_function"]:
-            if parameter not in parameters:
-                raise ValueError(f"Missing required parameter: '{parameter}'")
-        super().__init__(parameters)
+    block_size = Int(1024)
+    block_summary_fn = Callable()
+    file_summary_fn = Callable()
 
     def estimate(self, data: bytes) -> any:
         acf = []
-        for block in itertools.batched(data, self.parameters["block_size"]):
+        for block in itertools.batched(data, self.block_size):
             mean = np.mean(block)
             normalized_block = np.subtract(block, mean)
             numerator = signal.correlate(normalized_block, normalized_block)
@@ -38,11 +37,9 @@ class Autocorrelation(EstimatorBase):
             del normalized_block
             block_result = numerator / denominator
             del numerator, denominator
-            if self.parameters["block_summary_function"] is not None:
-                block_result = self.parameters["block_summary_function"](block_result)
+            block_result = self.block_summary_fn(block_result)
             acf.append(block_result)
             del block_result
 
-        if self.parameters["file_summary_function"] is not None:
-            acf = self.parameters["file_summary_function"](acf)
+        acf = self.file_summary_fn(acf)
         return acf

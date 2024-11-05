@@ -16,12 +16,13 @@ from imagecodecs import tiff_decode, jpegxl_encode, tiff_check
 
 from typing import Dict
 
+from traitlets import Bool
+
 from estimation_comparison.data_collection.compressor.image.base import ImageCompressorBase
 
 
 class JpegXlCompressor(ImageCompressorBase):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    lossless = Bool(True)
 
     def compress(self, data: bytes) -> bytes:
         if not tiff_check(data):

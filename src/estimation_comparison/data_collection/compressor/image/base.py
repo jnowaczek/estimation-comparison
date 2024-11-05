@@ -13,19 +13,12 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import abc
-from typing import Dict
 
 import numpy as np
+from traitlets import HasTraits
 
 
-class ImageCompressorBase:
-    parameters: Dict[str, any]
-
-    @abc.abstractmethod
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
+class ImageCompressorBase(HasTraits):
     @abc.abstractmethod
     def compress(self, data: np.ndarray) -> bytes:
         pass

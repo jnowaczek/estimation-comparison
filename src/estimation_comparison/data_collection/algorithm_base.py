@@ -14,8 +14,12 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from abc import ABC, abstractmethod
 
+from traitlets import HasTraits
 
-class AlgorithmBase(ABC):
+class AlgorithmMeta(type(ABC), type(HasTraits)):
+    pass
+
+class AlgorithmBase(ABC, HasTraits, metaclass=AlgorithmMeta):
     @abstractmethod
     def run(self, data: bytes) -> any:
         pass

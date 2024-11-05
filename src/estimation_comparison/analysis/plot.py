@@ -27,9 +27,8 @@ from pandas import DataFrame
 
 
 class PlotHandler:
-    def __init__(self, x: DataFrame, y: DataFrame):
-        self._x = x
-        self._y = y
+    def __init__(self, data: DataFrame):
+        self._data = data
         self.palette = Category20[20]
 
     def individual_plot(self, algorithm: str) -> any:
@@ -44,19 +43,22 @@ class PlotHandler:
                 return None
 
     def ratio_plot(self, x, y) -> any:
-        a = self._y.iloc[self._y.groupby("estimator").indices[y]].drop("estimator", axis=1)
-        b = self._x.iloc[self._x.groupby("compressor").indices[x]].drop("compressor", axis=1)
-        cds = ColumnDataSource(pd.merge(a, b, how="left", on="filename"))
+        df = self._data.loc[(self._data["compressor"] == x) & (self._data["estimator"] == y)]
+        cds = ColumnDataSource(df)
         plot = figure(title=f"{x} Compression Ratio vs {y} Metric", sizing_mode="stretch_both",
-                      tooltips=[("Estimator", "$name"), ("Metric", "$snap_y"), ("File name", "@filename")])
+                      tooltips=[("Estimator", "@estimator"), ("Metric", "$snap_y"), ("File name", "@filename")],
+                      x_axis_type="log")
+        plot.x_range.start = 0
         plot.scatter(
             x="ratio",
             y="metric",
             source=cds,
-            name=y
+            legend_label=y
         )
         plot.xaxis.axis_label = f"{x} Compression Ratio"
         plot.yaxis.axis_label = f"{y} Metric"
+        plot.legend.location = "top_left"
+        plot.legend.click_policy = "mute"
         return plot
 
     def line_plot_all_files(self, algorithm: str) -> any:

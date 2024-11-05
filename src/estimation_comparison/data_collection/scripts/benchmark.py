@@ -26,14 +26,11 @@ from typing import List
 
 import numpy as np
 
-from estimation_comparison.data_collection.compressor.general.gzip import GzipCompressor
-from estimation_comparison.data_collection.compressor.general.lzma import LzmaCompressor
-from estimation_comparison.data_collection.compressor.image.jpeg import JpegCompressor
-from estimation_comparison.data_collection.compressor.image.jpeg2k import Jpeg2kCompressor
-from estimation_comparison.data_collection.compressor.image.jxl import JpegXlCompressor
-from estimation_comparison.data_collection.compressor.image.png import PngCompressor
+from estimation_comparison.data_collection.compressor.general import *
+from estimation_comparison.data_collection.compressor.general.bzip2 import Bzip2Compressor
+from estimation_comparison.data_collection.compressor.image import *
 from estimation_comparison.database import BenchmarkDatabase, InputFile, Ratio, Metric
-from estimation_comparison.data_collection.estimator import Autocorrelation, ByteCount, Entropy
+from estimation_comparison.data_collection.estimator import *
 from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch, proportion_below_cutoff, \
     max_below_cutoff
 
@@ -45,59 +42,50 @@ class Benchmark:
         self.database = BenchmarkDatabase(Path(self.output_dir) / "benchmark.sqlite")
         self._estimators = {
             "autocorrelation_1k_64_notch_mean": Autocorrelation(
-                {"block_size": 67108864,
-                 "block_summary_function": functools.partial(max_outside_middle_notch, notch_width=32768),
-                 "file_summary_function": np.mean}),
-            "autocorrelation_1k_64_notch_max": Autocorrelation(
-                {"block_size": 1024,
-                 "block_summary_function": functools.partial(max_outside_middle_notch, notch_width=64),
-                 "file_summary_function": np.max}),
-            "autocorrelation_1k_768_cutoff_mean": Autocorrelation(
-                {"block_size": 1024,
-                 "block_summary_function": functools.partial(proportion_below_cutoff, cutoff=768),
-                 "file_summary_function": np.mean}),
-            "autocorrelation_1k_896_cutoff_mean": Autocorrelation(
-                {"block_size": 1024,
-                 "block_summary_function": functools.partial(proportion_below_cutoff, cutoff=896),
-                 "file_summary_function": np.mean}),
-            "autocorrelation_1k_768_cutoff_max": Autocorrelation(
-                {"block_size": 1024,
-                 "block_summary_function": functools.partial(proportion_below_cutoff, cutoff=768),
-                 "file_summary_function": np.max}),
-            "autocorrelation_1k_896_cutoff_max": Autocorrelation(
-                {"block_size": 1024,
-                 "block_summary_function": functools.partial(max_below_cutoff, cutoff=896),
-                 "file_summary_function": np.max}),
-            "autocorrelation_1k_768_cutoff_max_mean": Autocorrelation(
-                {"block_size": 1024,
-                 "block_summary_function": functools.partial(max_below_cutoff, cutoff=768),
-                 "file_summary_function": np.mean}),
-            "autocorrelation_1k_896_cutoff_max_mean": Autocorrelation(
-                {"block_size": 1024,
-                 "block_summary_function": functools.partial(max_below_cutoff, cutoff=896),
-                 "file_summary_function": np.mean}),
-            "autocorrelation_1k_768_cutoff_max_max": Autocorrelation(
-                {"block_size": 1024,
-                 "block_summary_function": functools.partial(max_below_cutoff, cutoff=768),
-                 "file_summary_function": np.max}),
-            "autocorrelation_1k_896_cutoff_max_max": Autocorrelation(
-                {"block_size": 1024,
-                 "block_summary_function": functools.partial(max_below_cutoff, cutoff=896),
-                 "file_summary_function": np.max}),
-            "bytecount_file": ByteCount({"block_size": None}),
-            "entropy_bits": Entropy({"base": 2}),
+                block_summary_fn=functools.partial(max_outside_middle_notch, notch_width=64),
+                file_summary_fn=np.mean),
+            # "autocorrelation_1k_64_notch_max": Autocorrelation(
+            #     block_summary_fn=functools.partial(max_outside_middle_notch, notch_width=64),
+            #     file_summary_fn=np.max),
+            # "autocorrelation_1k_768_cutoff_mean": Autocorrelation(
+            #     block_summary_fn=functools.partial(proportion_below_cutoff, cutoff=768),
+            #     file_summary_fn=np.mean),
+            # "autocorrelation_1k_896_cutoff_mean": Autocorrelation(
+            #     block_summary_fn=functools.partial(proportion_below_cutoff, cutoff=896),
+            #     file_summary_fn=np.mean),
+            # "autocorrelation_1k_768_cutoff_max": Autocorrelation(
+            #     block_summary_fn=functools.partial(proportion_below_cutoff, cutoff=768),
+            #     file_summary_fn=np.max),
+            # "autocorrelation_1k_896_cutoff_max": Autocorrelation(
+            #     block_summary_fn=functools.partial(max_below_cutoff, cutoff=896),
+            #     file_summary_fn=np.max),
+            # "autocorrelation_1k_768_cutoff_max_mean": Autocorrelation(
+            #     block_summary_fn=functools.partial(max_below_cutoff, cutoff=768),
+            #     file_summary_fn=np.mean),
+            # "autocorrelation_1k_896_cutoff_max_mean": Autocorrelation(
+            #     block_summary_fn=functools.partial(max_below_cutoff, cutoff=896),
+            #     file_summary_fn=np.mean),
+            # "autocorrelation_1k_768_cutoff_max_max": Autocorrelation(
+            #     block_summary_fn=functools.partial(max_below_cutoff, cutoff=768),
+            #     file_summary_fn=np.max),
+            # "autocorrelation_1k_896_cutoff_max_max": Autocorrelation(
+            #     block_summary_fn=functools.partial(max_below_cutoff, cutoff=896),
+            #     file_summary_fn=np.max),
+            # "bytecount_file": ByteCount(),
+            # "entropy_bits": Entropy(),
         }
         self._compressors = {
-            "gzip_9": GzipCompressor({"level": 9}),
+            "gzip_9": GzipCompressor(level=9),
             "jxl_lossless": JpegXlCompressor(lossless=True),
             "jpeg": JpegCompressor(),
             "jpeg2k": Jpeg2kCompressor(lossless=False, level=90),
             "jpeg2k_lossless": Jpeg2kCompressor(lossless=True),
-            "lzma": LzmaCompressor({}),
+            "lzma": LzmaCompressor(),
             "png": PngCompressor(),
+            "bzip2_9": Bzip2Compressor(level=9),
         }
 
-        self.process_pool = ProcessPoolExecutor(max_workers=workers)
+        self.process_pool = ProcessPoolExecutor(max_workers=workers, max_tasks_per_child=1)
 
     @staticmethod
     def _hash_file(p: Path) -> str:
@@ -162,7 +150,7 @@ class Benchmark:
     def _run_estimator(instance, file: InputFile):
         try:
             with open(file.path, "rb") as f:
-                instance.run(f.read())
+                return instance.run(f.read())
         except OSError as e:
             logging.exception(f"Error reading data file '{file.path}': {e}")
 

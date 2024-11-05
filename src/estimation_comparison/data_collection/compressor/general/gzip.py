@@ -12,18 +12,16 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from typing import Dict
 import zlib
+
+from traitlets import Int
 
 from estimation_comparison.data_collection.compressor.general.base import GeneralCompressorBase
 
 
 class GzipCompressor(GeneralCompressorBase):
-    def __init__(self, parameters: Dict[str, any]):
-        for parameter in ["level"]:
-            if parameter not in parameters:
-                raise ValueError(f"Missing required parameter: '{parameter}'")
-        super().__init__(parameters)
+    level = Int(9)
+    wbits = Int(31)
 
     def compress(self, data: bytes) -> bytes:
-        return zlib.compress(data, level=self.parameters["level"], wbits=31)
+        return zlib.compress(data, level=self.level, wbits=self.wbits)

@@ -14,15 +14,10 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from imagecodecs import tiff_decode, spng_encode, tiff_check
 
-from typing import Dict
-
 from estimation_comparison.data_collection.compressor.image.base import ImageCompressorBase
 
 
 class PngCompressor(ImageCompressorBase):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
     def compress(self, data: bytes) -> bytes:
         if not tiff_check(data):
             raise ValueError("Input must be tiff")

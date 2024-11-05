@@ -14,24 +14,21 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import array
 import itertools
-from typing import Dict, List
 
-from estimation_comparison.data_collection.estimator.estimator_base import EstimatorBase
+from traitlets import Int
+
+from estimation_comparison.data_collection.estimator.base import EstimatorBase
 
 
 class ByteCount(EstimatorBase):
-    def __init__(self, parameters: Dict[str, any]):
-        for parameter in ["block_size"]:
-            if parameter not in parameters:
-                raise ValueError(f"Missing required parameter: '{parameter}'")
-        super().__init__(parameters)
+    block_size = Int(None, allow_none=True)
 
-    def estimate(self, data: bytes) -> List[int]:
+    def estimate(self, data: bytes) -> [int]:
         blocks = [data]
         results = []
 
-        if self.parameters["block_size"] is not None:
-            blocks = itertools.batched(data, self.parameters["block_size"])
+        if self.block_size is not None:
+            blocks = itertools.batched(data, self.block_size)
 
         for block in blocks:
             appearances = array.array("L", [0] * 256)

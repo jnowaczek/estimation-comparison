@@ -19,12 +19,6 @@ from estimation_comparison.data_collection.algorithm_base import AlgorithmBase
 
 
 class GeneralCompressorBase(AlgorithmBase):
-    parameters: Dict[str, any]
-
-    @abc.abstractmethod
-    def __init__(self, parameters: Dict[str, any]):
-        self.parameters = parameters
-
     @abc.abstractmethod
     def compress(self, data: bytes) -> bytes:
         pass

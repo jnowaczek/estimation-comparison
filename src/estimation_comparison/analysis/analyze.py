@@ -15,7 +15,6 @@
 import argparse
 import logging
 import pickle
-import webbrowser
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 from pathlib import Path
@@ -23,6 +22,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from bokeh.io import save
+import hvplot.pandas
+from holoviews import opts
+import bokeh.models
 
 from estimation_comparison.analysis.plot import PlotHandler
 from estimation_comparison.database import BenchmarkDatabase
@@ -47,8 +49,18 @@ class Analyze:
         # self.metrics = pd.DataFrame().from_records(self.database.get_all_metric(),
         #                                            columns=["filename", "estimator", "metric"])
         description, records = self.database.get_dataframe()
-        self.data = pd.DataFrame().from_records(records, columns=description)
-        print(self.data.head())
+
+        def unpickle(record):
+            r_list = list(record)
+            if isinstance(r_list[4], bytes):
+                r_list[4] = pickle.loads(r_list[4])
+            if isinstance(r_list[4], list) and len(r_list[4]) == 1:
+                r_list[4] = r_list[4][0]
+            return tuple(r_list)
+
+        records = list(map(unpickle, records))
+        self.data = pd.DataFrame().from_records(records, columns=[item[0] for item in description])
+        logging.info(f"Loaded {self.data.shape} dataframe")
 
     def load(self, filename: Path):
         suffix = filename.suffix
@@ -61,16 +73,38 @@ class Analyze:
                 raise ValueError(f"Unsupported file type: {suffix}")
         logging.info(f"Loaded '{filename}'")
         self._create_dataframes()
-        self.plot_handler = PlotHandler(self.ratios, self.metrics)
+        self.plot_handler = PlotHandler(self.data)
 
     def run(self):
+        print(self.data.columns)
+        print(self.data.dtypes)
+        print(type(self.data["filename"][0]))
+        # Passing opts to the explorer either takes forever with lots of graphs or doesn't work, set default instead
+        # opts.defaults(opts.Scatter(hover_tooltips=["butt"]))
+        hve = self.data.hvplot.explorer()
+        # hve.show()
+
         plots = {}
 
-        for compressor in self.ratios["compressor"].unique():
-            for estimator in self.metrics["estimator"].unique():
-                plots[(compressor, estimator)] = self.plot_handler.ratio_plot(compressor, estimator)
-                break
-            break
+        # for compressor in self.data["compressor"].unique():
+        #     for estimator in self.data["estimator"].unique():
+        #         plots[(compressor, estimator)] = self.plot_handler.ratio_plot(compressor, estimator)
+
+        # p = self.data.hvplot(
+        #     by=['estimator'],
+        #     groupby=['compressor'],
+        #     height=1000,
+        #     kind='scatter',
+        #     logx=True,
+        #     logy=True,
+        #     x='ratio',
+        #     y=['metric'],
+        #     legend='bottom_right',
+        #     widget_location='bottom',
+        #     # hover_tooltips=[("Filename", "@filename")],
+        #     use_index=True,
+        # )
+        # p.show()
 
         # for algorithm in filter(lambda x: "Parameters" not in x, self.data.columns):
         #     print(f"{algorithm}: {self.data[algorithm].corr(self.data['jxl'])}")

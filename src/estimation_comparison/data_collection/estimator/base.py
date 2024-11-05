@@ -12,25 +12,15 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from imagecodecs import tiff_decode, jpeg2k_encode, tiff_check
-from traitlets import Bool, validate, Int
+import abc
 
-from estimation_comparison.data_collection.compressor.image.base import ImageCompressorBase
+from estimation_comparison.data_collection.algorithm_base import AlgorithmBase
 
 
-class Jpeg2kCompressor(ImageCompressorBase):
-    lossless = Bool(True)
-    level = Int(0)
+class EstimatorBase(AlgorithmBase):
+    @abc.abstractmethod
+    def estimate(self, data: bytes) -> any:
+        pass
 
-    @validate("level")
-    def _check_level(self, proposal):
-        if self.lossless:
-            return 0
-        return proposal["value"]
-
-    def compress(self, data: bytes) -> bytes:
-        if not tiff_check(data):
-            raise ValueError("Input must be tiff")
-
-        nda = tiff_decode(data)
-        return jpeg2k_encode(nda, level=self.level, reversible=self.lossless)
+    def run(self, data: bytes) -> any:
+        return self.estimate(data)

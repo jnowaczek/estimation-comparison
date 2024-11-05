@@ -32,6 +32,8 @@ import sqlite3
 from pathlib import Path
 from typing import NamedTuple
 
+from estimation_comparison.data_collection.estimator.base import EstimatorBase
+
 InputFile = NamedTuple("InputFile", [("hash", str), ("path", str), ("name", str)])
 Ratio = NamedTuple("Ratio", [("hash", str), ("algorithm", str), ("ratio", float)])
 Metric = NamedTuple("Metric", [("hash", str), ("estimator", str), ("metric", bytes)])
@@ -149,7 +151,7 @@ class BenchmarkDatabase:
         try:
             estimator_list = []
             for key, value in estimators.items():
-                estimator_list.append({"name": key, "parameters": str(value.parameters)})
+                estimator_list.append({"name": key, "parameters": str(value.traits())})
 
             self.con.executemany("INSERT OR IGNORE INTO estimators(name, parameters) VALUES(:name, :parameters)",
                                  estimator_list)
