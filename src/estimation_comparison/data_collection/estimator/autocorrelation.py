@@ -13,7 +13,6 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import itertools
-from typing import Dict
 
 import numpy as np
 import scipy.signal as signal

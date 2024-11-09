@@ -25,21 +25,18 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import collections
+import hashlib
 import logging
+import os
 import pickle
 import sqlite3
 from pathlib import Path
-from typing import NamedTuple
+from timeit import default_timer
+from typing import Tuple, List
 
-from estimation_comparison.data_collection.estimator.base import EstimatorBase
+import dask.distributed
 
-InputFile = NamedTuple("InputFile", [("hash", str), ("path", str), ("name", str)])
-Ratio = NamedTuple("Ratio", [("hash", str), ("algorithm", str), ("ratio", float)])
-Metric = NamedTuple("Metric", [("hash", str), ("estimator", str), ("metric", bytes)])
-
-FriendlyRatio = NamedTuple("Ratio", [("file_name", str), ("algorithm", str), ("ratio", float)])
-FriendlyMetric = NamedTuple("Metric", [("file_name", str), ("estimator", str), ("metric", any)])
+from estimation_comparison.model import InputFile, Ratio, FriendlyRatio, Metric, FriendlyMetric, Compressor
 
 
 class BenchmarkDatabase:
@@ -86,10 +83,10 @@ class BenchmarkDatabase:
             )""")
         self.con.commit()
 
-    def update_compressors(self, compressor_list: [str]):
+    def update_compressors(self, compressors: List[Compressor]):
         try:
-            compressors = [(c,) for c in compressor_list]
-            self.con.executemany("INSERT OR IGNORE INTO compressors(name) VALUES(?)", compressors)
+            names = [(c.name,) for c in compressors]
+            self.con.executemany("INSERT OR IGNORE INTO compressors(name) VALUES(?)", names)
             self.con.commit()
         except sqlite3.Error as e:
             logging.exception(e)
@@ -191,3 +188,57 @@ class BenchmarkDatabase:
                           FROM file_ratios
                                  LEFT OUTER JOIN file_estimations on file_ratios.file_hash = file_estimations.file_hash""")
         return cursor.description, cursor.fetchall()
+
+    @staticmethod
+    def _hash_file(p: Path) -> str:
+        with open(p, "rb") as f:
+            return hashlib.file_digest(f, hashlib.sha256).hexdigest()
+
+    def update_files(self, client: dask.distributed.Client, locations):
+        hash_tasks = []
+
+        # Glob 'em, hash 'em, and INSERT 'em
+        for s in locations:
+            path = Path(s)
+            logging.debug(f"Entering directory '{path}'")
+            for file in filter(lambda f: f.is_file(), path.glob("**/*")):
+                future = client.submit(self._hash_file, file)
+                future.context = (str(file), os.path.relpath(file, path))
+                hash_tasks.append(future)
+
+        for future, result in dask.distributed.as_completed(hash_tasks, with_results=True):
+            self.update_file(
+                InputFile(result, future.context[0], future.context[1]))
+
+    @staticmethod
+    def _ratio_file(compressor: Compressor, f: InputFile) -> Tuple[InputFile, Compressor, float]:
+        try:
+            with open(f.path, "rb") as fd:
+                return f, compressor, compressor.instance.run(fd.read())
+        except ValueError as e:
+            logging.warning(e)
+
+    def update_ratios(self, client: dask.distributed.Client, compressors: List[Compressor]):
+        ratio_start_time = default_timer()
+        ratio_tasks = []
+        submitted_ratio_tasks = 0
+        completed_ratio_tasks = 0
+
+        for f in self.get_all_files():
+            ratios: {str: float} = {x.algorithm: x.ratio for x in self.get_ratios_for_file(f.hash)}
+
+            for c in compressors:
+                if c.name not in ratios.keys():
+                    future = client.submit(self._ratio_file, c, f)
+                    ratio_tasks.append(future)
+                    submitted_ratio_tasks += 1
+
+        for future, result in dask.distributed.as_completed(ratio_tasks, with_results=True):
+            self.update_ratio(
+                Ratio(result[0].hash, result[1].name, result[2]))
+            completed_ratio_tasks += 1
+            logging.info(
+                f"{completed_ratio_tasks}/{submitted_ratio_tasks} tasks complete, {completed_ratio_tasks / submitted_ratio_tasks * 100:.2f}%")
+
+        logging.info(
+            f"Calculated {completed_ratio_tasks} compression ratios in {default_timer() - ratio_start_time:.3f} seconds")
