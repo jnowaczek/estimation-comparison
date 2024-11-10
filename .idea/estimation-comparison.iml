@@ -10,6 +10,9 @@
       <excludeFolder url="file://$MODULE_DIR$/output" />
       <excludeFolder url="file://$MODULE_DIR$/benchmarks" />
       <excludeFolder url="file://$MODULE_DIR$/image_data" />
+      <excludeFolder url="file://$MODULE_DIR$/.idea/dataSources" />
+      <excludeFolder url="file://$MODULE_DIR$/src/estimation_comparison.egg-info" />
+      <excludeFolder url="file://$MODULE_DIR$/unused_data" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

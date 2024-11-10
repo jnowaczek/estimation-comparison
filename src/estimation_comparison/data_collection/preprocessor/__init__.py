@@ -12,5 +12,5 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from .patch_sample import PatchSampler
 from .sampler_base import BaseSampler, NoopSampler
+from .patch_sample import PatchSampler

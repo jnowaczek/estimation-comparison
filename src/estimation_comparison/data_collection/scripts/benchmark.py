@@ -102,10 +102,13 @@ class Benchmark:
         self.database.update_compressors(self._compressors)
         logging.info("Updating benchmark database estimator list")
         self.database.update_estimators(self._estimators)
+        logging.info("Updating benchmark database preprocessor list")
+        self.database.update_preprocessors(self._preprocessors)
         logging.info("Updating benchmark database file hash list")
         self.database.update_files(self.client, self.data_locations)
         logging.info("Updating benchmark database compression ratios")
         self.database.update_ratios(self.client, self._compressors)
+
 
     def preprocess_input(self):
         start_time = default_timer()
@@ -120,15 +123,15 @@ class Benchmark:
 
     def run(self):
         start_time = default_timer()
-        num_tasks = self.database.input_file_count * len(self._estimators.values())
+        num_tasks = self.database.input_file_count * len(self._estimators)
         completed_tasks = 0
 
         tasks = []
         for file in self.database.get_all_files():
-            for instance_name, instance in self._estimators.items():
+            for e in self._estimators:
                 try:
-                    future = self.client.submit(self._run_estimator, instance, file)
-                    future.context = {"estimator_name": instance_name, "estimator_instance": instance, "file": file}
+                    future = self.client.submit(self._run_estimator, e.instance, file)
+                    future.context = {"estimator_name": e.name, "estimator_instance": e.instance, "file": file}
                     tasks.append(future)
                 except Exception as e:
                     logging.exception(f"Input file '{file.name}' raised exception\n\t{e})")

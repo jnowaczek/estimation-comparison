@@ -36,7 +36,8 @@ from typing import Tuple, List
 
 import dask.distributed
 
-from estimation_comparison.model import InputFile, Ratio, FriendlyRatio, Metric, FriendlyMetric, Compressor
+from estimation_comparison.model import InputFile, Ratio, FriendlyRatio, Metric, FriendlyMetric, Compressor, Estimator, \
+    Preprocessor
 
 
 class BenchmarkDatabase:
@@ -55,7 +56,8 @@ class BenchmarkDatabase:
         self.con.execute(
             """CREATE TABLE IF NOT EXISTS compressors(
                 compressor_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
-                name TEXT NOT NULL UNIQUE
+                name TEXT NOT NULL UNIQUE,
+                parameters BLOB
             )""")
         self.con.commit()
         # self.cur.execute("CREATE TABLE tag_types(tag_id INT PRIMARY KEY NOT NULL, tag_name TEXT NOT NULL)")
@@ -72,7 +74,7 @@ class BenchmarkDatabase:
             """CREATE TABLE IF NOT EXISTS estimators(
                 estimator_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                 name TEXT NOT NULL UNIQUE,
-                parameters TEXT
+                parameters BLOB
             )""")
         self.con.commit()
         self.con.execute(
@@ -82,11 +84,23 @@ class BenchmarkDatabase:
                 metric BLOB
             )""")
         self.con.commit()
+        self.con.execute(
+            """CREATE TABLE IF NOT EXISTS preprocessors(
+                preprocessor_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                name TEXT NOT NULL UNIQUE,
+                parameters BLOB
+            )""")
+        self.con.commit()
 
     def update_compressors(self, compressors: List[Compressor]):
         try:
-            names = [(c.name,) for c in compressors]
-            self.con.executemany("INSERT OR IGNORE INTO compressors(name) VALUES(?)", names)
+            compressor_list = []
+            for c in compressors:
+                compressor_list.append(
+                    {"name": c.name, "parameters": pickle.dumps(c.instance.traits(), protocol=pickle.HIGHEST_PROTOCOL)})
+
+            self.con.executemany("INSERT OR IGNORE INTO compressors(name, parameters) VALUES(:name, :parameters)",
+                                 compressor_list)
             self.con.commit()
         except sqlite3.Error as e:
             logging.exception(e)
@@ -144,13 +158,27 @@ class BenchmarkDatabase:
             ratios.append(FriendlyRatio(*row, ))
         return ratios
 
-    def update_estimators(self, estimators: {str: any}):
+    def update_estimators(self, estimators: List[Estimator]):
         try:
             estimator_list = []
-            for key, value in estimators.items():
-                estimator_list.append({"name": key, "parameters": str(value.traits())})
+            for e in estimators:
+                estimator_list.append(
+                    {"name": e.name, "parameters": pickle.dumps(e.instance.traits(), protocol=pickle.HIGHEST_PROTOCOL)})
 
             self.con.executemany("INSERT OR IGNORE INTO estimators(name, parameters) VALUES(:name, :parameters)",
+                                 estimator_list)
+            self.con.commit()
+        except sqlite3.Error as e:
+            logging.exception(e)
+
+    def update_preprocessors(self, preprocessors: List[Preprocessor]):
+        try:
+            estimator_list = []
+            for p in preprocessors:
+                estimator_list.append(
+                    {"name": p.name, "parameters": pickle.dumps(p.instance.traits(), protocol=pickle.HIGHEST_PROTOCOL)})
+
+            self.con.executemany("INSERT OR IGNORE INTO preprocessors(name, parameters) VALUES(:name, :parameters)",
                                  estimator_list)
             self.con.commit()
         except sqlite3.Error as e:
@@ -207,8 +235,7 @@ class BenchmarkDatabase:
                 hash_tasks.append(future)
 
         for future, result in dask.distributed.as_completed(hash_tasks, with_results=True):
-            self.update_file(
-                InputFile(result, future.context[0], future.context[1]))
+            self.update_file(InputFile(result, future.context[0], future.context[1]))
 
     @staticmethod
     def _ratio_file(compressor: Compressor, f: InputFile) -> Tuple[InputFile, Compressor, float]:
