@@ -1,4 +1,4 @@
-#  Copyright (C) 2024 Julian Nowaczek.
+# Copyright (C) 2024 Julian Nowaczek.
 #
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -15,14 +15,30 @@
 from dataclasses import dataclass
 from typing import NamedTuple
 
-from estimation_comparison.data_collection.compressor.general.base import GeneralCompressorBase
-from estimation_comparison.data_collection.compressor.image.base import ImageCompressorBase
+import numpy as np
+
+from estimation_comparison.data_collection.compressor.general import GeneralCompressorBase
+from estimation_comparison.data_collection.compressor.image import ImageCompressorBase
+from estimation_comparison.data_collection.estimator import EstimatorBase
+from estimation_comparison.data_collection.preprocessor import BaseSampler
+
+
+@dataclass
+class Estimator:
+    name: str
+    instance: EstimatorBase
 
 
 @dataclass
 class Compressor:
     name: str
     instance: GeneralCompressorBase | ImageCompressorBase
+
+
+@dataclass
+class Preprocessor:
+    name: str
+    instance: BaseSampler[bytes | np.ndarray]
 
 
 InputFile = NamedTuple("InputFile", [("hash", str), ("path", str), ("name", str)])

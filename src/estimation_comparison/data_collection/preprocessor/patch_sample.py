@@ -25,32 +25,22 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from random import random, seed
-from typing import Iterable
-
 import numpy as np
-from traitlets import Bytes, Int, HasTraits, Float
+from sklearn.feature_extraction import image
+from traitlets import Int, Float
+
+from estimation_comparison.data_collection.preprocessor import BaseSampler
 
 
-class PatchSampler(HasTraits):
-    seed = Bytes(b"deadbeef")
-    patch_dim = Int(32)
+class PatchSampler(BaseSampler[np.ndarray]):
+    seed = Int(1337)
+    # An (18, 18, 3) patch is 972 bytes
+    patch_dim = Int(18)
     fraction = Float(0.1)
 
-    def _make_patches(self, image: np.ndarray) -> Iterable[np.ndarray]:
-        seed(self.seed)
-        x, y = 0, 0
-
-        while y < image.shape[1]:
-            x = 0
-            while x < image.shape[0]:
-                if random() < self.fraction:
-                    yield image[y:y + self.patch_dim, x:x + self.patch_dim, :]
-                x += self.patch_dim
-            y += self.patch_dim
-
-    def run(self, image: np.ndarray) -> bytes:
-        result = bytearray()
-        for patch in self._make_patches(image):
-            result.append(patch.flatten())
-        return result
+    def run(self, data: np.ndarray) -> np.ndarray:
+        # Too clever for me, I'll just import the thing
+        return image.extract_patches_2d(data,
+                                        patch_size=(self.patch_dim, self.patch_dim),
+                                        max_patches=self.fraction,
+                                        random_state=self.seed)

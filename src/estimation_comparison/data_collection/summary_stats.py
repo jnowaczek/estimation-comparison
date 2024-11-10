@@ -23,8 +23,10 @@ def max_outside_middle_notch(x, notch_width: int):
     except ValueError:
         return 0.0
 
+
 def proportion_below_cutoff(x, cutoff: int):
     return np.sum(np.abs(x[:cutoff])) / np.sum(np.abs(x))
+
 
 def max_below_cutoff(x, cutoff: int):
     try:

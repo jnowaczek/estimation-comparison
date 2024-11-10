@@ -16,8 +16,10 @@ from abc import ABC, abstractmethod
 
 from traitlets import HasTraits
 
+
 class AlgorithmMeta(type(ABC), type(HasTraits)):
     pass
+
 
 class AlgorithmBase(ABC, HasTraits, metaclass=AlgorithmMeta):
     @abstractmethod

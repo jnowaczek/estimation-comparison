@@ -19,6 +19,7 @@ dependencies = [
     "traitlets>=5.14.3",
     "dask[distributed]>=2024.10.0",
     "zstandard>=0.23.0",
+    "scikit-learn>=1.5.2",
 ]
 requires-python = ">=3.12"
 readme = "README.md"

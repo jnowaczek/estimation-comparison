@@ -13,10 +13,6 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from imagecodecs import tiff_decode, jpeg_encode, tiff_check
-
-from typing import Dict
-
-from imagecodecs.imagecodecs import jpeg_encode
 from traitlets import Bool
 
 from estimation_comparison.data_collection.compressor.image.base import ImageCompressorBase

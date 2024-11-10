@@ -12,6 +12,7 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+from .base import ImageCompressorBase
 from .jpeg import JpegCompressor
 from .jpeg2k import Jpeg2kCompressor
 from .jxl import JpegXlCompressor

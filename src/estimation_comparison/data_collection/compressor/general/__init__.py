@@ -12,5 +12,8 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+from .base import GeneralCompressorBase
+from .bzip2 import Bzip2Compressor
 from .gzip import GzipCompressor
 from .lzma import LzmaCompressor
+from .zstd import ZstandardCompressor

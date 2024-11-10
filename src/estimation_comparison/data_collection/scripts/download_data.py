@@ -19,7 +19,6 @@ import random
 from concurrent import futures
 from concurrent.futures import ProcessPoolExecutor
 from hashlib import file_digest
-from io import BytesIO
 from pathlib import Path
 
 import requests

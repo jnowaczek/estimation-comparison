@@ -13,27 +13,23 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import argparse
+import functools
 import logging
 import pickle
-import functools
-from timeit import default_timer
 from pathlib import Path
+from timeit import default_timer
 from typing import List
 
-from dask.distributed import Client
 import numpy as np
-from distributed import as_completed
-from zstandard.backend_cffi import ZstdCompressor
+from dask.distributed import Client, as_completed
 
 from estimation_comparison.data_collection.compressor.general import *
-from estimation_comparison.data_collection.compressor.general.bzip2 import Bzip2Compressor
-from estimation_comparison.data_collection.compressor.general.zstd import ZstandardCompressor
 from estimation_comparison.data_collection.compressor.image import *
-from estimation_comparison.database import BenchmarkDatabase, InputFile, Ratio, Metric
 from estimation_comparison.data_collection.estimator import *
-from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch, proportion_below_cutoff, \
-    max_below_cutoff
-from estimation_comparison.model import Compressor
+from estimation_comparison.data_collection.preprocessor import NoopSampler, PatchSampler
+from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch
+from estimation_comparison.database import BenchmarkDatabase
+from estimation_comparison.model import Compressor, Estimator, Preprocessor, InputFile, Metric
 
 
 class Benchmark:
@@ -42,10 +38,20 @@ class Benchmark:
         self.data_locations = input_dir
         self.output_dir = output_dir
         self.database = BenchmarkDatabase(Path(self.output_dir) / "benchmark.sqlite")
-        self._estimators = {
-            "autocorrelation_1k_64_notch_mean": Autocorrelation(
-                block_summary_fn=functools.partial(max_outside_middle_notch, notch_width=64),
-                file_summary_fn=np.mean),
+
+        self._preprocessors: List[Preprocessor] = [
+            Preprocessor(name="noop", instance=NoopSampler()),
+            Preprocessor(name="patch_random", instance=PatchSampler())
+        ]
+
+        self._estimators: List[Estimator] = [
+            Estimator(
+                name="autocorrelation_1k_64_notch_mean",
+                instance=Autocorrelation(
+                    block_summary_fn=functools.partial(max_outside_middle_notch, notch_width=64),
+                    file_summary_fn=np.mean
+                )
+            ),
             # "autocorrelation_1k_64_notch_max": Autocorrelation(
             #     block_summary_fn=functools.partial(max_outside_middle_notch, notch_width=64),
             #     file_summary_fn=np.max),
@@ -75,7 +81,8 @@ class Benchmark:
             #     file_summary_fn=np.max),
             # "bytecount_file": ByteCount(),
             # "entropy_bits": Entropy(),
-        }
+        ]
+
         self._compressors: List[Compressor] = [
             Compressor(name="gzip_9", instance=GzipCompressor(level=9)),
             Compressor(name="jxl_lossless", instance=JpegXlCompressor(lossless=True)),
@@ -99,6 +106,9 @@ class Benchmark:
         self.database.update_files(self.client, self.data_locations)
         logging.info("Updating benchmark database compression ratios")
         self.database.update_ratios(self.client, self._compressors)
+
+    def preprocess_input(self):
+        start_time = default_timer()
 
     @staticmethod
     def _run_estimator(instance, file: InputFile):
