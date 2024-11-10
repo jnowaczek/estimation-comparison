@@ -13,7 +13,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from dataclasses import dataclass
-from typing import NamedTuple
+from typing import NamedTuple, List
 
 import numpy as np
 
@@ -21,6 +21,14 @@ from estimation_comparison.data_collection.compressor.general import GeneralComp
 from estimation_comparison.data_collection.compressor.image import ImageCompressorBase
 from estimation_comparison.data_collection.estimator import EstimatorBase
 from estimation_comparison.data_collection.preprocessor import BaseSampler
+
+InputFile = NamedTuple("InputFile", [("hash", str), ("path", str), ("name", str)])
+
+Ratio = NamedTuple("Ratio", [("hash", str), ("algorithm", str), ("ratio", float)])
+Metric = NamedTuple("Metric", [("hash", str), ("estimator", str), ("metric", bytes)])
+
+FriendlyRatio = NamedTuple("Ratio", [("file_name", str), ("algorithm", str), ("ratio", float)])
+FriendlyMetric = NamedTuple("Metric", [("file_name", str), ("estimator", str), ("metric", any)])
 
 
 @dataclass
@@ -38,13 +46,18 @@ class Compressor:
 @dataclass
 class Preprocessor:
     name: str
-    instance: BaseSampler[bytes | np.ndarray]
+    instance: BaseSampler[np.ndarray]
 
 
-InputFile = NamedTuple("InputFile", [("hash", str), ("path", str), ("name", str)])
+@dataclass
+class IntermediateResult:
+    data: np.ndarray
+    completed_stages: List[str]
+    input_file: InputFile
 
-Ratio = NamedTuple("Ratio", [("hash", str), ("algorithm", str), ("ratio", float)])
-Metric = NamedTuple("Metric", [("hash", str), ("estimator", str), ("metric", bytes)])
 
-FriendlyRatio = NamedTuple("Ratio", [("file_name", str), ("algorithm", str), ("ratio", float)])
-FriendlyMetric = NamedTuple("Metric", [("file_name", str), ("estimator", str), ("metric", any)])
+@dataclass
+class Result:
+    value: int | float
+    completed_stages: List[str]
+    input_file: InputFile

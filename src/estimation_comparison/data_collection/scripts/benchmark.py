@@ -20,8 +20,10 @@ from pathlib import Path
 from timeit import default_timer
 from typing import List
 
+import dask.distributed
 import numpy as np
 from dask.distributed import Client, as_completed
+from imagecodecs import tiff_check, tiff_decode
 
 from estimation_comparison.data_collection.compressor.general import *
 from estimation_comparison.data_collection.compressor.image import *
@@ -29,7 +31,8 @@ from estimation_comparison.data_collection.estimator import *
 from estimation_comparison.data_collection.preprocessor import NoopSampler, PatchSampler
 from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch
 from estimation_comparison.database import BenchmarkDatabase
-from estimation_comparison.model import Compressor, Estimator, Preprocessor, InputFile, Metric
+from estimation_comparison.model import Compressor, Estimator, Preprocessor, InputFile, Metric, IntermediateResult, \
+    Result
 
 
 class Benchmark:
@@ -95,7 +98,7 @@ class Benchmark:
             Compressor(name="zstd", instance=ZstandardCompressor()),
         ]
 
-        self.client = Client()
+        self.client = Client(memory_limit=0.05)
 
     def update_database(self):
         logging.info("Updating benchmark database compressor list")
@@ -109,46 +112,73 @@ class Benchmark:
         logging.info("Updating benchmark database compression ratios")
         self.database.update_ratios(self.client, self._compressors)
 
-
-    def preprocess_input(self):
-        start_time = default_timer()
-
     @staticmethod
-    def _run_estimator(instance, file: InputFile):
+    def _load_file(file: InputFile) -> IntermediateResult:
         try:
             with open(file.path, "rb") as f:
-                return instance.run(f.read())
+                data = f.read()
+                if tiff_check(data):
+                    return IntermediateResult(data=tiff_decode(data), completed_stages=["tiff_decode"], input_file=file)
+                else:
+                    return IntermediateResult(data=np.frombuffer(f.read()), completed_stages=["load_bytes"],
+                                              input_file=file)
         except OSError as e:
-            logging.exception(f"Error reading data file '{file.path}': {e}")
+            logging.exception(f"Error reading {file}: {e}")
+
+    @staticmethod
+    def _preprocess_file(preprocessor: Preprocessor, ir: IntermediateResult) -> IntermediateResult:
+        ir.data = preprocessor.instance.run(ir.data)
+        ir.completed_stages.append(preprocessor.name)
+        return ir
+
+    @staticmethod
+    def _run_estimator(estimator: Estimator, ir: IntermediateResult) -> Result:
+        value = estimator.instance.run(ir.data)
+        stages = ir.completed_stages
+        stages.append(estimator.name)
+        return Result(value=value, completed_stages=stages, input_file=ir.input_file)
 
     def run(self):
         start_time = default_timer()
         num_tasks = self.database.input_file_count * len(self._estimators)
         completed_tasks = 0
 
-        tasks = []
-        for file in self.database.get_all_files():
-            for e in self._estimators:
-                try:
-                    future = self.client.submit(self._run_estimator, e.instance, file)
-                    future.context = {"estimator_name": e.name, "estimator_instance": e.instance, "file": file}
-                    tasks.append(future)
-                except Exception as e:
-                    logging.exception(f"Input file '{file.name}' raised exception\n\t{e})")
+        input_files = self.database.get_all_files()
+        loaded_files = self.client.map(self._load_file, input_files)
 
-        for future, result in as_completed(tasks, with_results=True):
+        preprocessed = []
+        for p in self._preprocessors:
+            for file in loaded_files:
+                preprocessed.append(self.client.submit(functools.partial(self._preprocess_file, p), file))
+        # preprocessed = self.client.map(self._preprocess_file, self._preprocessors, loaded_files)
+
+        results = []
+        for e in self._estimators:
+            for future in preprocessed:
+                try:
+                    results.append(
+                        self.client.submit(functools.partial(self._run_estimator, e), future, priority=9))
+                except Exception as ex:
+                    logging.exception(f"Running estimator raised exception\n\t{ex})")
+
+        for future in as_completed(results):
             completed_tasks += 1
             logging.info(
-                f"{completed_tasks}/{num_tasks} estimation tasks complete, {completed_tasks / num_tasks * 100:.2f}%")
+                f"{completed_tasks}/{num_tasks} estimation tasks complete, {completed_tasks / len(results) * 100:.2f}%")
+            r = future.result()
             try:
-                self.database.update_metric(
-                    Metric(future.context["file"].hash, future.context["estimator_name"],
-                           pickle.dumps(result, pickle.HIGHEST_PROTOCOL)))
+                f = self.client.submit(self.database.update_metric,
+                                       Metric(r.input_file.hash, r.completed_stages[-1],
+                                              pickle.dumps(r.value, pickle.HIGHEST_PROTOCOL)), priority=10)
+                dask.distributed.fire_and_forget(f)
+                # self.database.update_metric(
+                #     Metric(result.input_file.hash, result.completed_stages[-1],
+                #            pickle.dumps(result.value, pickle.HIGHEST_PROTOCOL)))
                 # self.results[future.context["file"].name] |= {
                 #     f"{future.context["estimator_name"]} Parameters": future.context["estimator_instance"].parameters,
                 #     f"{future.context["estimator_name"]}": future.result()}
             except Exception as e:
-                logging.exception(f"Input file '{future.context["file"].name}' raised exception\n\t{e}")
+                logging.exception(f"Input file '{r.input_file.name}' raised exception\n\t{e}")
             finally:
                 del future
 

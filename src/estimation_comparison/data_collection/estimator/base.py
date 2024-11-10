@@ -14,13 +14,15 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import abc
 
+import numpy as np
+
 from estimation_comparison.data_collection.algorithm_base import AlgorithmBase
 
 
 class EstimatorBase(AlgorithmBase):
     @abc.abstractmethod
-    def estimate(self, data: bytes) -> any:
+    def estimate(self, data: np.ndarray) -> any:
         pass
 
-    def run(self, data: bytes) -> any:
+    def run(self, data: np.ndarray) -> any:
         return self.estimate(data)

@@ -26,7 +26,7 @@ class Autocorrelation(EstimatorBase):
     block_summary_fn = Callable()
     file_summary_fn = Callable()
 
-    def estimate(self, data: bytes) -> any:
+    def estimate(self, data: np.ndarray) -> any:
         acf = []
         for block in itertools.batched(data, self.block_size):
             mean = np.mean(block)
