@@ -13,10 +13,10 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from abc import ABC
-from typing import Iterable, Generic, Protocol, TypeVar
 
-import numpy as np
-from traitlets import Bytes, Int, HasTraits, Float
+# noinspection PyProtectedMember
+from traitlets import HasTraits
+
 
 class BaseSamplerMeta(type(ABC), type(HasTraits)):
     pass

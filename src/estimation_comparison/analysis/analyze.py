@@ -15,16 +15,14 @@
 import argparse
 import logging
 import pickle
+import webbrowser
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
-import numpy as np
 import pandas as pd
 from bokeh.io import save
-import hvplot.pandas
-from holoviews import opts
-import bokeh.models
 
 from estimation_comparison.analysis.plot import PlotHandler
 from estimation_comparison.database import BenchmarkDatabase
@@ -32,7 +30,7 @@ from estimation_comparison.database import BenchmarkDatabase
 
 class Analyze:
     def __init__(self, output_dir: str, workers: int | None, parallel=False):
-        self.database: BenchmarkDatabase = None
+        self.database: Optional[BenchmarkDatabase] = None
         self.data: pd.DataFrame | None = None
         self.output_dir = output_dir
         self.workers = workers
@@ -82,7 +80,7 @@ class Analyze:
         # Passing opts to the explorer either takes forever with lots of graphs or doesn't work, set default instead
         # opts.defaults(opts.Scatter(hover_tooltips=["butt"]))
         hve = self.data.hvplot.explorer()
-        # hve.show()
+        hve.show()
 
         plots = {}
 

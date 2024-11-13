@@ -44,6 +44,7 @@ class RaiseDownloader:
         try:
             if not self.force_download:
                 with open(self.path, "rb") as f:
+                    # noinspection PyTypeChecker
                     if not file_digest(f, "sha256").hexdigest() in RAISE_HASHES:
                         logging.error(f"CSV hash does not match known dataset hash, --skip-hash-check to override")
                         exit(1)

@@ -14,6 +14,7 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import zlib
 
+# noinspection PyProtectedMember
 from traitlets import Int
 
 from estimation_comparison.data_collection.compressor.general.base import GeneralCompressorBase

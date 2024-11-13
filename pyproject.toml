@@ -17,9 +17,10 @@ dependencies = [
     "wand>=0.6.13",
     "hvplot>=0.11.0",
     "traitlets>=5.14.3",
-    "dask[distributed]>=2024.10.0",
+    "dask[complete]>=2024.11.0",
     "zstandard>=0.23.0",
-    "scikit-learn>=1.5.2",
+    "asyncssh>=2.18.0",
+    "paramiko>=3.5.0",
 ]
 requires-python = ">=3.12"
 readme = "README.md"

@@ -28,7 +28,7 @@ class _SynthDataFileSpec:
         return self.func(size)
 
 
-class SyntheticDataGenerator():
+class SyntheticDataGenerator:
     def __init__(self, output_dir: Path):
         self.output_dir: Path = output_dir
 

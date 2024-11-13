@@ -16,6 +16,7 @@ import itertools
 
 import numpy as np
 import scipy.signal as signal
+# noinspection PyProtectedMember
 from traitlets import Callable, Int
 
 from estimation_comparison.data_collection.estimator.base import EstimatorBase
@@ -28,7 +29,9 @@ class Autocorrelation(EstimatorBase):
 
     def estimate(self, data: np.ndarray) -> any:
         acf = []
-        for block in itertools.batched(data, self.block_size):
+        flat = data.flatten()
+        del data
+        for block in itertools.batched(flat, self.block_size):
             mean = np.mean(block)
             normalized_block = np.subtract(block, mean)
             numerator = signal.correlate(normalized_block, normalized_block)

@@ -14,6 +14,8 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import unittest
 
+import numpy as np
+
 from estimation_comparison.data_collection.estimator.autocorrelation import Autocorrelation
 
 
@@ -21,11 +23,11 @@ class BasicAutocorrelationTests(unittest.TestCase):
     basic = Autocorrelation({"block_size": 1024})
 
     def test_zeros(self):
-        result = self.basic.estimate(b"0" * 1024)
+        result = self.basic.estimate(np.frombuffer(b"0" * 1024))
         self.assertEqual(result, 1)
 
     def test_count(self):
-        result = self.basic.estimate(bytes(range(256)) * 4)
+        result = self.basic.estimate(np.frombuffer(bytes(range(256)) * 4))
         self.assertEqual(result, 0)
 
 

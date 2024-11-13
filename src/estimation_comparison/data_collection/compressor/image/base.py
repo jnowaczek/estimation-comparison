@@ -15,6 +15,7 @@
 import abc
 
 import numpy as np
+# noinspection PyProtectedMember
 from traitlets import HasTraits
 
 

@@ -15,6 +15,7 @@
 import array
 import itertools
 
+# noinspection PyProtectedMember
 from traitlets import Int
 
 from estimation_comparison.data_collection.estimator.base import EstimatorBase

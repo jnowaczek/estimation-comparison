@@ -1,0 +1,3 @@
+<component name="DependencyValidationManager">
+  <scope name="pdm.lock" pattern="file:pdm.lock" />
+</component>

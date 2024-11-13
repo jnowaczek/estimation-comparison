@@ -136,14 +136,14 @@ class BenchmarkDatabase:
     def input_file_count(self) -> int:
         return self.con.execute("SELECT COUNT(*) FROM files").fetchone()[0]
 
-    def get_ratios_for_file(self, hash: str):
+    def get_ratios_for_file(self, file_hash: str):
         ratios = []
         for row in self.con.execute(
                 """SELECT file_hash,
                  (SELECT name FROM compressors WHERE file_ratios.compressor_id=compressors.compressor_id),
                  ratio
                  FROM file_ratios WHERE file_hash = ?""",
-                (hash,)).fetchall():
+                (file_hash,)).fetchall():
             ratios.append(Ratio(*row))
         return ratios
 
@@ -220,6 +220,7 @@ class BenchmarkDatabase:
     @staticmethod
     def _hash_file(p: Path) -> str:
         with open(p, "rb") as f:
+            # noinspection PyTypeChecker
             return hashlib.file_digest(f, hashlib.sha256).hexdigest()
 
     def update_files(self, client: dask.distributed.Client, locations):
@@ -256,6 +257,7 @@ class BenchmarkDatabase:
 
             for c in compressors:
                 if c.name not in ratios.keys():
+                    # noinspection PyTypeChecker
                     future = client.submit(self._ratio_file, c, f)
                     ratio_tasks.append(future)
                     submitted_ratio_tasks += 1

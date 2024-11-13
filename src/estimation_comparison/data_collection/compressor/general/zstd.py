@@ -13,6 +13,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import zstandard
+# noinspection PyProtectedMember
 from traitlets import Int
 
 from estimation_comparison.data_collection.compressor.general.base import GeneralCompressorBase

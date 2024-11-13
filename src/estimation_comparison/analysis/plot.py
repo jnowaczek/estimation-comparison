@@ -15,11 +15,8 @@
 import itertools
 import logging
 
-import bokeh.colors.util
 import numpy as np
-import pandas as pd
-import scipy
-from bokeh.models import ColumnDataSource, FactorRange, HoverTool, Label
+from bokeh.models import ColumnDataSource, FactorRange, HoverTool
 from bokeh.palettes import Category20
 from bokeh.plotting import figure
 from bokeh.transform import factor_cmap
@@ -36,7 +33,7 @@ class PlotHandler:
             case "entropy_bits" | "bytecount_file" | "gzip_max" | "lzma":
                 pass
             case "autocorrelation_1k" as a:
-                # return self.line_plot_all_files(a)
+                return self.line_plot_all_files(a)
                 pass
             case _:
                 logging.error(f"Unable to plot unknown estimator: {algorithm}")

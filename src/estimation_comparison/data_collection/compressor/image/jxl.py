@@ -13,6 +13,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from imagecodecs import tiff_decode, jpegxl_encode, tiff_check
+# noinspection PyProtectedMember
 from traitlets import Bool
 
 from estimation_comparison.data_collection.compressor.image.base import ImageCompressorBase

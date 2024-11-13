@@ -20,7 +20,6 @@ from pathlib import Path
 from timeit import default_timer
 from typing import List
 
-import dask.distributed
 import numpy as np
 from dask.distributed import Client, as_completed
 from imagecodecs import tiff_check, tiff_decode
@@ -29,14 +28,13 @@ from estimation_comparison.data_collection.compressor.general import *
 from estimation_comparison.data_collection.compressor.image import *
 from estimation_comparison.data_collection.estimator import *
 from estimation_comparison.data_collection.preprocessor import NoopSampler, PatchSampler
-from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch
 from estimation_comparison.database import BenchmarkDatabase
 from estimation_comparison.model import Compressor, Estimator, Preprocessor, InputFile, Metric, IntermediateResult, \
     Result
 
 
 class Benchmark:
-    def __init__(self, input_dir: List[str], output_dir: str, workers: int | None):
+    def __init__(self, input_dir: List[str], output_dir: str):
         self._init_time = default_timer()
         self.data_locations = input_dir
         self.output_dir = output_dir
@@ -48,13 +46,13 @@ class Benchmark:
         ]
 
         self._estimators: List[Estimator] = [
-            Estimator(
-                name="autocorrelation_1k_64_notch_mean",
-                instance=Autocorrelation(
-                    block_summary_fn=functools.partial(max_outside_middle_notch, notch_width=64),
-                    file_summary_fn=np.mean
-                )
-            ),
+            # Estimator(
+            #     name="autocorrelation_1k_64_notch_mean",
+            #     instance=Autocorrelation(
+            #         block_summary_fn=functools.partial(max_outside_middle_notch, notch_width=64),
+            #         file_summary_fn=np.mean
+            #     )
+            # ),
             # "autocorrelation_1k_64_notch_max": Autocorrelation(
             #     block_summary_fn=functools.partial(max_outside_middle_notch, notch_width=64),
             #     file_summary_fn=np.max),
@@ -83,7 +81,7 @@ class Benchmark:
             #     block_summary_fn=functools.partial(max_below_cutoff, cutoff=896),
             #     file_summary_fn=np.max),
             # "bytecount_file": ByteCount(),
-            # "entropy_bits": Entropy(),
+            Estimator(name="entropy_bits", instance=Entropy()),
         ]
 
         self._compressors: List[Compressor] = [
@@ -98,7 +96,7 @@ class Benchmark:
             Compressor(name="zstd", instance=ZstandardCompressor()),
         ]
 
-        self.client = Client(memory_limit=0.05)
+        self.client = Client()
 
     def update_database(self):
         logging.info("Updating benchmark database compressor list")
@@ -144,33 +142,33 @@ class Benchmark:
         completed_tasks = 0
 
         input_files = self.database.get_all_files()
-        loaded_files = self.client.map(self._load_file, input_files)
+        loaded_files = self.client.map(self._load_file, input_files, priority=0)
 
         preprocessed = []
         for p in self._preprocessors:
             for file in loaded_files:
-                preprocessed.append(self.client.submit(functools.partial(self._preprocess_file, p), file))
+                preprocessed.append(self.client.submit(functools.partial(self._preprocess_file, p), file, priority=5))
         # preprocessed = self.client.map(self._preprocess_file, self._preprocessors, loaded_files)
+        del loaded_files
 
         results = []
         for e in self._estimators:
             for future in preprocessed:
                 try:
+                    # noinspection PyTypeChecker
                     results.append(
-                        self.client.submit(functools.partial(self._run_estimator, e), future, priority=9))
+                        self.client.submit(functools.partial(self._run_estimator, e), future, priority=10))
                 except Exception as ex:
                     logging.exception(f"Running estimator raised exception\n\t{ex})")
+        del preprocessed
 
-        for future in as_completed(results):
+        for future, result in as_completed(results, with_results=True):
             completed_tasks += 1
             logging.info(
                 f"{completed_tasks}/{num_tasks} estimation tasks complete, {completed_tasks / len(results) * 100:.2f}%")
-            r = future.result()
             try:
-                f = self.client.submit(self.database.update_metric,
-                                       Metric(r.input_file.hash, r.completed_stages[-1],
-                                              pickle.dumps(r.value, pickle.HIGHEST_PROTOCOL)), priority=10)
-                dask.distributed.fire_and_forget(f)
+                self.database.update_metric(Metric(result.input_file.hash, result.completed_stages[-1],
+                                                   pickle.dumps(result.value, pickle.HIGHEST_PROTOCOL)))
                 # self.database.update_metric(
                 #     Metric(result.input_file.hash, result.completed_stages[-1],
                 #            pickle.dumps(result.value, pickle.HIGHEST_PROTOCOL)))
@@ -178,9 +176,9 @@ class Benchmark:
                 #     f"{future.context["estimator_name"]} Parameters": future.context["estimator_instance"].parameters,
                 #     f"{future.context["estimator_name"]}": future.result()}
             except Exception as e:
-                logging.exception(f"Input file '{r.input_file.name}' raised exception\n\t{e}")
-            finally:
-                del future
+                logging.exception(f"Input file '{result.input_file.name}' raised exception\n\t{e}")
+
+        del results
 
         logging.info(f"Estimation completed in {default_timer() - start_time:.3f} seconds")
         logging.info(f"Benchmark completed in {default_timer() - self._init_time:.3f} seconds")
@@ -190,14 +188,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("dir", action="append")
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true")
-    parser.add_argument("-w", "--workers", type=int, dest="workers", default=None)
     parser.add_argument("-l", "--limit-files", type=int, dest="file_limit", default=0)
     parser.add_argument("-o", "--output_dir", type=str, dest="output_dir", default="./benchmarks")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
 
-    benchmark = Benchmark(args.dir, args.output_dir, workers=args.workers)
+    benchmark = Benchmark(args.dir, args.output_dir)
     benchmark.update_database()
 
     benchmark.run()

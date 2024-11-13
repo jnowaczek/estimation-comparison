@@ -25,8 +25,12 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+import itertools
+import math
+import random
+
 import numpy as np
-from sklearn.feature_extraction import image
+# noinspection PyProtectedMember
 from traitlets import Int, Float
 
 from estimation_comparison.data_collection.preprocessor import BaseSampler
@@ -39,8 +43,36 @@ class PatchSampler(BaseSampler[np.ndarray]):
     fraction = Float(0.1)
 
     def run(self, data: np.ndarray) -> np.ndarray:
-        # Too clever for me, I'll just import the thing
-        return image.extract_patches_2d(data,
-                                        patch_size=(self.patch_dim, self.patch_dim),
-                                        max_patches=self.fraction,
-                                        random_state=self.seed)
+        if self.patch_dim > data.shape[0]:
+            raise ValueError(
+                f"Requested patch height is too tall for supplied data: {self.patch_dim} > {data.shape[0]}")
+        if self.patch_dim > data.shape[1]:
+            raise ValueError(
+                f"Requested patch width is too wide for supplied data: {self.patch_dim} > {data.shape[1]}")
+
+        patch_start_rows = range(0, data.shape[0], self.patch_dim)
+        patch_start_cols = range(0, data.shape[1], self.patch_dim)
+        all_patches = list(itertools.product(patch_start_rows, patch_start_cols))
+        random.seed(self.seed)
+        sample_patches = random.sample(all_patches, math.floor(len(all_patches) * self.fraction))
+        result = b""
+        for patch in sample_patches:
+            result += data[patch[0]:patch[0]+self.patch_dim, patch[1]:patch[1]+self.patch_dim,:].flatten().tobytes()
+        return result
+
+# class PatchSamplerBytes(BaseSampler[bytes]):
+#     seed = Int(1337)
+#     patch_dim = Int(18)
+#     chunk_size = Int(1024)
+#     fraction = Float(0.1)
+#
+#     def run(self, data: bytes) -> bytes:
+#         patches = image.extract_patches_2d(data,
+#                                            patch_size=(self.patch_dim, self.patch_dim),
+#                                            max_patches=self.fraction,
+#                                            random_state=self.seed)
+#         result = b""
+#         for patch in patches:
+#             result += patch.flatten()
+#             result += b"\x00" * (self.chunk_size - len(result) % self.chunk_size)
+#         return result
