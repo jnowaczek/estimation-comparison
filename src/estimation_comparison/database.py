@@ -36,8 +36,8 @@ from typing import Tuple, List
 
 import dask.distributed
 
-from estimation_comparison.model import InputFile, Ratio, FriendlyRatio, Metric, FriendlyMetric, Compressor, Estimator, \
-    Preprocessor
+from estimation_comparison.model import InputFile, Ratio, FriendlyRatio, FriendlyMetric, Compressor, Estimator, \
+    Preprocessor, Result
 
 
 class BenchmarkDatabase:
@@ -80,6 +80,7 @@ class BenchmarkDatabase:
         self.con.execute(
             """CREATE TABLE IF NOT EXISTS file_estimations(
                 file_hash REFERENCES files(file_hash) NOT NULL, 
+                preprocessor_id REFERENCES preprocessors(preprocessor_id) NOT NULL,
                 estimator_id REFERENCES estimators(estimator_id) NOT NULL, 
                 metric BLOB
             )""")
@@ -173,26 +174,30 @@ class BenchmarkDatabase:
 
     def update_preprocessors(self, preprocessors: List[Preprocessor]):
         try:
-            estimator_list = []
+            preprocessor_list = []
             for p in preprocessors:
-                estimator_list.append(
+                preprocessor_list.append(
                     {"name": p.name, "parameters": pickle.dumps(p.instance.traits(), protocol=pickle.HIGHEST_PROTOCOL)})
 
             self.con.executemany("INSERT OR IGNORE INTO preprocessors(name, parameters) VALUES(:name, :parameters)",
-                                 estimator_list)
+                                 preprocessor_list)
             self.con.commit()
         except sqlite3.Error as e:
             logging.exception(e)
 
-    def update_metric(self, new_metric: Metric):
+    def update_result(self, result: Result):
         try:
             self.con.execute(
-                """INSERT INTO file_estimations VALUES(:hash, (SELECT estimator_id FROM estimators WHERE name=:estimator_name), :metric)""",
-                new_metric
+                """INSERT INTO file_estimations VALUES(?, 
+                                                          (SELECT preprocessor_id FROM preprocessors WHERE name=?), 
+                                                          (SELECT estimator_id FROM estimators WHERE name=?),
+                                                          ?)""",
+                (result.input_file.hash, result.preprocessor.name, result.estimator.name,
+                 pickle.dumps(result.value, protocol=pickle.HIGHEST_PROTOCOL))
             )
             self.con.commit()
         except sqlite3.Error as e:
-            logging.exception(e, new_metric)
+            logging.exception(e, result)
 
     def get_all_metric(self):
         metrics = []

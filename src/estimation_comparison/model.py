@@ -13,7 +13,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from dataclasses import dataclass
-from typing import NamedTuple, List
+from typing import NamedTuple, List, Self
 
 import numpy as np
 
@@ -48,12 +48,18 @@ class Preprocessor:
     name: str
     instance: BaseSampler[np.ndarray]
 
+@dataclass
+class LoadedData:
+    data: np.ndarray
+    completed_stages: List[str]
+    input_file: InputFile
 
 @dataclass
 class IntermediateResult:
     data: np.ndarray
     completed_stages: List[str]
     input_file: InputFile
+    preprocessor: Preprocessor
 
 
 @dataclass
@@ -61,3 +67,10 @@ class Result:
     value: int | float
     completed_stages: List[str]
     input_file: InputFile
+    preprocessor: Preprocessor
+    estimator: Estimator
+
+    @classmethod
+    def from_intermediate_result(cls, ir: IntermediateResult, value: int | float, estimator: Estimator) -> Self:
+        return Result(value=value, completed_stages=ir.completed_stages + [estimator.name], input_file=ir.input_file,
+                      preprocessor=ir.preprocessor, estimator=estimator)

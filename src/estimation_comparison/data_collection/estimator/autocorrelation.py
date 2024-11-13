@@ -29,7 +29,7 @@ class Autocorrelation(EstimatorBase):
 
     def estimate(self, data: np.ndarray) -> any:
         acf = []
-        flat = data.flatten()
+        flat = data.tobytes()
         del data
         for block in itertools.batched(flat, self.block_size):
             mean = np.mean(block)

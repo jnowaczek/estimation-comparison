@@ -15,7 +15,6 @@
 import argparse
 import functools
 import logging
-import pickle
 from pathlib import Path
 from timeit import default_timer
 from typing import List
@@ -28,9 +27,10 @@ from estimation_comparison.data_collection.compressor.general import *
 from estimation_comparison.data_collection.compressor.image import *
 from estimation_comparison.data_collection.estimator import *
 from estimation_comparison.data_collection.preprocessor import NoopSampler, PatchSampler
+from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch
 from estimation_comparison.database import BenchmarkDatabase
-from estimation_comparison.model import Compressor, Estimator, Preprocessor, InputFile, Metric, IntermediateResult, \
-    Result
+from estimation_comparison.model import Compressor, Estimator, Preprocessor, InputFile, IntermediateResult, \
+    Result, LoadedData
 
 
 class Benchmark:
@@ -46,13 +46,21 @@ class Benchmark:
         ]
 
         self._estimators: List[Estimator] = [
-            # Estimator(
-            #     name="autocorrelation_1k_64_notch_mean",
-            #     instance=Autocorrelation(
-            #         block_summary_fn=functools.partial(max_outside_middle_notch, notch_width=64),
-            #         file_summary_fn=np.mean
-            #     )
-            # ),
+            Estimator(
+                name="autocorrelation_1k_64_notch_mean",
+                instance=Autocorrelation(
+                    block_summary_fn=functools.partial(max_outside_middle_notch, notch_width=64),
+                    file_summary_fn=np.mean
+                )
+            ),
+            Estimator(
+                name="autocorrelation_972_64_notch_mean",
+                instance=Autocorrelation(
+                    block_size=972,
+                    block_summary_fn=functools.partial(max_outside_middle_notch, notch_width=64),
+                    file_summary_fn=np.mean
+                )
+            ),
             # "autocorrelation_1k_64_notch_max": Autocorrelation(
             #     block_summary_fn=functools.partial(max_outside_middle_notch, notch_width=64),
             #     file_summary_fn=np.max),
@@ -111,30 +119,30 @@ class Benchmark:
         self.database.update_ratios(self.client, self._compressors)
 
     @staticmethod
-    def _load_file(file: InputFile) -> IntermediateResult:
+    def _load_file(file: InputFile) -> LoadedData:
         try:
             with open(file.path, "rb") as f:
                 data = f.read()
                 if tiff_check(data):
-                    return IntermediateResult(data=tiff_decode(data), completed_stages=["tiff_decode"], input_file=file)
+                    return LoadedData(data=tiff_decode(data), completed_stages=["tiff_decode"], input_file=file)
                 else:
-                    return IntermediateResult(data=np.frombuffer(f.read()), completed_stages=["load_bytes"],
-                                              input_file=file)
+                    return LoadedData(data=np.frombuffer(data), completed_stages=["load_bytes"],
+                                      input_file=file)
         except OSError as e:
             logging.exception(f"Error reading {file}: {e}")
 
     @staticmethod
-    def _preprocess_file(preprocessor: Preprocessor, ir: IntermediateResult) -> IntermediateResult:
-        ir.data = preprocessor.instance.run(ir.data)
-        ir.completed_stages.append(preprocessor.name)
-        return ir
+    def _preprocess_file(preprocessor: Preprocessor, data: LoadedData) -> IntermediateResult:
+        return IntermediateResult(preprocessor.instance.run(data.data),
+                                  completed_stages=data.completed_stages + [preprocessor.name],
+                                  input_file=data.input_file, preprocessor=preprocessor)
 
     @staticmethod
     def _run_estimator(estimator: Estimator, ir: IntermediateResult) -> Result:
-        value = estimator.instance.run(ir.data)
-        stages = ir.completed_stages
-        stages.append(estimator.name)
-        return Result(value=value, completed_stages=stages, input_file=ir.input_file)
+        try:
+            return Result.from_intermediate_result(ir, estimator.instance.run(ir.data), estimator)
+        except Exception as e:
+            logging.exception(f"Error estimating {ir.input_file}: {e}")
 
     def run(self):
         start_time = default_timer()
@@ -167,8 +175,7 @@ class Benchmark:
             logging.info(
                 f"{completed_tasks}/{num_tasks} estimation tasks complete, {completed_tasks / len(results) * 100:.2f}%")
             try:
-                self.database.update_metric(Metric(result.input_file.hash, result.completed_stages[-1],
-                                                   pickle.dumps(result.value, pickle.HIGHEST_PROTOCOL)))
+                self.database.update_result(result)
                 # self.database.update_metric(
                 #     Metric(result.input_file.hash, result.completed_stages[-1],
                 #            pickle.dumps(result.value, pickle.HIGHEST_PROTOCOL)))

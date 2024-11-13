@@ -55,10 +55,9 @@ class PatchSampler(BaseSampler[np.ndarray]):
         all_patches = list(itertools.product(patch_start_rows, patch_start_cols))
         random.seed(self.seed)
         sample_patches = random.sample(all_patches, math.floor(len(all_patches) * self.fraction))
-        result = b""
-        for patch in sample_patches:
-            result += data[patch[0]:patch[0]+self.patch_dim, patch[1]:patch[1]+self.patch_dim,:].flatten().tobytes()
-        return result
+        return np.hstack(
+            [data[coord[0]:coord[0] + self.patch_dim, coord[1]:coord[1] + self.patch_dim, :].flatten() for coord in
+             sample_patches])
 
 # class PatchSamplerBytes(BaseSampler[bytes]):
 #     seed = Int(1337)
