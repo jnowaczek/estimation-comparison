@@ -204,16 +204,18 @@ class BenchmarkDatabase:
         for row in self.con.execute(
                 """SELECT 
                    (SELECT name FROM files where file_estimations.file_hash=files.file_hash),
+                   (SELECT name FROM preprocessors where file_estimations.preprocessor_id=preprocessors.preprocessor_id),
                    (SELECT name FROM estimators WHERE file_estimations.estimator_id=estimators.estimator_id),
                    metric
                    FROM file_estimations""").fetchall():
-            metrics.append(FriendlyMetric(file_name=row[0], estimator=row[1],
-                                          metric=row[2] if not isinstance(row[2], bytes) else pickle.loads(row[2])))
+            metrics.append(FriendlyMetric(file_name=row[0], preprocessor=row[1], estimator=row[2],
+                                          metric=row[3] if not isinstance(row[3], bytes) else pickle.loads(row[3])))
         return metrics
 
     def get_dataframe(self):
         cursor = self.con.cursor()
         cursor.execute("""SELECT (SELECT name FROM files WHERE file_ratios.file_hash = files.file_hash) as filename,
+                                 (SELECT name FROM preprocessors WHERE file_estimations.preprocessor_id = preprocessors.preprocessor_id) as preprocessor,
                                  (SELECT name FROM estimators WHERE file_estimations.estimator_id = estimators.estimator_id) as estimator,
                                  (SELECT name FROM compressors WHERE file_ratios.compressor_id = compressors.compressor_id) as compressor,
                                  file_ratios.ratio as ratio,

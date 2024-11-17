@@ -27,6 +27,7 @@ from estimation_comparison.data_collection.compressor.general import *
 from estimation_comparison.data_collection.compressor.image import *
 from estimation_comparison.data_collection.estimator import *
 from estimation_comparison.data_collection.preprocessor import NoopSampler, PatchSampler
+from estimation_comparison.data_collection.preprocessor.linear_sample import LinearSampler
 from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch
 from estimation_comparison.database import BenchmarkDatabase
 from estimation_comparison.model import Compressor, Estimator, Preprocessor, InputFile, IntermediateResult, \
@@ -41,8 +42,17 @@ class Benchmark:
         self.database = BenchmarkDatabase(Path(self.output_dir) / "benchmark.sqlite")
 
         self._preprocessors: List[Preprocessor] = [
-            Preprocessor(name="noop", instance=NoopSampler()),
-            Preprocessor(name="patch_random", instance=PatchSampler())
+            # Preprocessor(name="noop", instance=NoopSampler()),
+            # Preprocessor(name="patch_random_10%", instance=PatchSampler(fraction=0.1)),
+            # Preprocessor(name="patch_random_20%", instance=PatchSampler(fraction=0.2)),
+            # Preprocessor(name="patch_random_40%", instance=PatchSampler(fraction=0.4)),
+            # Preprocessor(name="patch_random_60%", instance=PatchSampler(fraction=0.6)),
+            # Preprocessor(name="patch_random_80%", instance=PatchSampler(fraction=0.8)),
+            Preprocessor(name="linear_random_10%", instance=LinearSampler(fraction=0.1)),
+            Preprocessor(name="linear_random_20%", instance=LinearSampler(fraction=0.2)),
+            Preprocessor(name="linear_random_40%", instance=LinearSampler(fraction=0.4)),
+            Preprocessor(name="linear_random_60%", instance=LinearSampler(fraction=0.6)),
+            Preprocessor(name="linear_random_80%", instance=LinearSampler(fraction=0.8)),
         ]
 
         self._estimators: List[Estimator] = [

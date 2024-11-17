@@ -23,6 +23,7 @@ from typing import Optional
 
 import pandas as pd
 from bokeh.io import save
+import hvplot.pandas
 
 from estimation_comparison.analysis.plot import PlotHandler
 from estimation_comparison.database import BenchmarkDatabase
@@ -50,10 +51,10 @@ class Analyze:
 
         def unpickle(record):
             r_list = list(record)
-            if isinstance(r_list[4], bytes):
-                r_list[4] = pickle.loads(r_list[4])
-            if isinstance(r_list[4], list) and len(r_list[4]) == 1:
-                r_list[4] = r_list[4][0]
+            if isinstance(r_list[5], bytes):
+                r_list[5] = pickle.loads(r_list[5])
+            if isinstance(r_list[5], list) and len(r_list[5]) == 1:
+                r_list[5] = r_list[5][0]
             return tuple(r_list)
 
         records = list(map(unpickle, records))

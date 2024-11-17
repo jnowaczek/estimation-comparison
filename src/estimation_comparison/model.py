@@ -28,7 +28,7 @@ Ratio = NamedTuple("Ratio", [("hash", str), ("algorithm", str), ("ratio", float)
 Metric = NamedTuple("Metric", [("hash", str), ("estimator", str), ("metric", bytes)])
 
 FriendlyRatio = NamedTuple("Ratio", [("file_name", str), ("algorithm", str), ("ratio", float)])
-FriendlyMetric = NamedTuple("Metric", [("file_name", str), ("estimator", str), ("metric", any)])
+FriendlyMetric = NamedTuple("Metric", [("file_name", str), ("preprocessor", str), ("estimator", str), ("metric", any)])
 
 
 @dataclass
