@@ -5,10 +5,21 @@
 groups = ["default"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:37b6eedaeb4815ce8cf19f6fef27ab40d831be72a1318af47de1a8f8366e7b6b"
+content_hash = "sha256:a2d099d72e26ad310ab99847f6bb0c31f53b9f9f04eee9862e54f798e7b1325e"
 
 [[metadata.targets]]
 requires_python = ">=3.12"
+
+[[package]]
+name = "asteval"
+version = "1.0.5"
+requires_python = ">=3.8"
+summary = "Safe, minimalistic evaluator of python expression using ast module"
+groups = ["default"]
+files = [
+    {file = "asteval-1.0.5-py3-none-any.whl", hash = "sha256:082b95312578affc8a6d982f7d92b7ac5de05634985c87e7eedd3188d31149fa"},
+    {file = "asteval-1.0.5.tar.gz", hash = "sha256:bac3c8dd6d2b789e959cfec9bb296fb8338eec066feae618c462132701fbc665"},
+]
 
 [[package]]
 name = "asyncssh"
@@ -374,6 +385,17 @@ files = [
 ]
 
 [[package]]
+name = "dill"
+version = "0.3.9"
+requires_python = ">=3.8"
+summary = "serialize all of Python"
+groups = ["default"]
+files = [
+    {file = "dill-0.3.9-py3-none-any.whl", hash = "sha256:468dff3b89520b474c0397703366b7b95eebe6303f108adf9b19da1f702be87a"},
+    {file = "dill-0.3.9.tar.gz", hash = "sha256:81aa267dddf68cbfe8029c42ca9ec6a4ab3b22371d1c450abc54422577b4512c"},
+]
+
+[[package]]
 name = "distributed"
 version = "2024.11.0"
 requires_python = ">=3.10"
@@ -596,6 +618,24 @@ dependencies = [
 files = [
     {file = "linkify-it-py-2.0.3.tar.gz", hash = "sha256:68cda27e162e9215c17d786649d1da0021a451bdc436ef9e0fa0ba5234b9b048"},
     {file = "linkify_it_py-2.0.3-py3-none-any.whl", hash = "sha256:6bcbc417b0ac14323382aef5c5192c0075bf8a9d6b41820a2b66371eac6b6d79"},
+]
+
+[[package]]
+name = "lmfit"
+version = "1.3.2"
+requires_python = ">=3.8"
+summary = "Least-Squares Minimization with Bounds and Constraints"
+groups = ["default"]
+dependencies = [
+    "asteval>=1.0",
+    "dill>=0.3.4",
+    "numpy>=1.19",
+    "scipy>=1.6",
+    "uncertainties>=3.2.2",
+]
+files = [
+    {file = "lmfit-1.3.2-py3-none-any.whl", hash = "sha256:2b834f054cd7a5172f3b431345b292e5d95ea387d6f96d60ad35a11b8efee6ac"},
+    {file = "lmfit-1.3.2.tar.gz", hash = "sha256:31beeae1f027c1b8c14dcd7f2e8488a80b75fb389e77fca677549bdc2fe597bb"},
 ]
 
 [[package]]
@@ -1312,6 +1352,17 @@ groups = ["default"]
 files = [
     {file = "uc-micro-py-1.0.3.tar.gz", hash = "sha256:d321b92cff673ec58027c04015fcaa8bb1e005478643ff4a500882eaab88c48a"},
     {file = "uc_micro_py-1.0.3-py3-none-any.whl", hash = "sha256:db1dffff340817673d7b466ec86114a9dc0e9d4d9b5ba229d9d60e5c12600cd5"},
+]
+
+[[package]]
+name = "uncertainties"
+version = "3.2.2"
+requires_python = ">=3.8"
+summary = "calculations with values with uncertainties, error propagation"
+groups = ["default"]
+files = [
+    {file = "uncertainties-3.2.2-py3-none-any.whl", hash = "sha256:fd8543355952f4052786ed4150acaf12e23117bd0f5bd03ea07de466bce646e7"},
+    {file = "uncertainties-3.2.2.tar.gz", hash = "sha256:e62c86fdc64429828229de6ab4e11466f114907e6bd343c077858994cc12e00b"},
 ]
 
 [[package]]

@@ -25,7 +25,6 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import itertools
 import math
 import random
 
@@ -48,7 +47,9 @@ class LinearSampler(BaseSampler[np.ndarray]):
             raise ValueError(
                 f"Requested patch length is too long for supplied data: {self.patch_len} > {data.shape[0]}")
 
-        patch_start_indexes = range(0, data.shape[0], self.patch_len)
+        patch_start_indexes = list(filter(lambda x: x + self.patch_len < data.shape[0],
+                                          range(0, data.shape[0], self.patch_len)))
         random.seed(self.seed)
-        sample_patches = random.sample(patch_start_indexes, math.floor(len(patch_start_indexes) * self.fraction))
-        return np.hstack([data[coord[0]:coord[0] + self.patch_len, :] for coord in sample_patches])
+        sample_patches = random.sample(patch_start_indexes,
+                                       max(math.floor(len(patch_start_indexes) * self.fraction), 1))
+        return np.hstack([data[coord:coord + self.patch_len, :] for coord in sample_patches])

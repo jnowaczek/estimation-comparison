@@ -57,13 +57,6 @@ class Benchmark:
 
         self._estimators: List[Estimator] = [
             Estimator(
-                name="autocorrelation_1k_64_notch_mean",
-                instance=Autocorrelation(
-                    block_summary_fn=functools.partial(max_outside_middle_notch, notch_width=64),
-                    file_summary_fn=np.mean
-                )
-            ),
-            Estimator(
                 name="autocorrelation_972_64_notch_mean",
                 instance=Autocorrelation(
                     block_size=972,
@@ -156,7 +149,7 @@ class Benchmark:
 
     def run(self):
         start_time = default_timer()
-        num_tasks = self.database.input_file_count * len(self._estimators)
+        num_tasks = self.database.input_file_count * len(self._estimators) * len(self._preprocessors)
         completed_tasks = 0
 
         input_files = self.database.get_all_files()

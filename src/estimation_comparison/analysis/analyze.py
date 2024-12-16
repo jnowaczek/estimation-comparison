@@ -13,8 +13,8 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import argparse
+import itertools
 import logging
-import pickle
 import webbrowser
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
@@ -23,8 +23,9 @@ from typing import Optional
 
 import pandas as pd
 from bokeh.io import save
-import hvplot.pandas
+from bokeh.plotting import figure, show
 
+from estimation_comparison.analysis.fit import exponential_fit, linear_fit, quadratic_fit
 from estimation_comparison.analysis.plot import PlotHandler
 from estimation_comparison.database import BenchmarkDatabase
 
@@ -49,15 +50,6 @@ class Analyze:
         #                                            columns=["filename", "estimator", "metric"])
         description, records = self.database.get_dataframe()
 
-        def unpickle(record):
-            r_list = list(record)
-            if isinstance(r_list[5], bytes):
-                r_list[5] = pickle.loads(r_list[5])
-            if isinstance(r_list[5], list) and len(r_list[5]) == 1:
-                r_list[5] = r_list[5][0]
-            return tuple(r_list)
-
-        records = list(map(unpickle, records))
         self.data = pd.DataFrame().from_records(records, columns=[item[0] for item in description])
         logging.info(f"Loaded {self.data.shape} dataframe")
 
@@ -74,16 +66,57 @@ class Analyze:
         self._create_dataframes()
         self.plot_handler = PlotHandler(self.data)
 
-    def run(self):
+    def run_explore(self):
         print(self.data.columns)
         print(self.data.dtypes)
         print(type(self.data["filename"][0]))
         # Passing opts to the explorer either takes forever with lots of graphs or doesn't work, set default instead
-        # opts.defaults(opts.Scatter(hover_tooltips=["butt"]))
+        # opts.defaults(opts.Scatter(hover_tooltips=["test"]))
         hve = self.data.hvplot.explorer()
         hve.show()
 
+    def run_fit(self):
+
+        est = self.data["estimator"].unique().tolist()
+        pre = self.data["preprocessor"].unique().tolist()
+        comp = self.data["compressor"].unique().tolist()
+
+        for e in est:
+            for (p, c) in itertools.product(pre, comp):
+                subset = self.data.loc[(self.data["estimator"] == e) & (self.data["preprocessor"] == p)]
+                subset = subset.sort_values("ratio")
+
+                if not subset.empty:
+                    x = subset.ratio.tolist()
+                    y = subset.metric.tolist()
+
+                    linear = linear_fit(x, y)
+                    quadratic = quadratic_fit(x, y)
+                    exponential = exponential_fit(x, y)
+
+                    f = figure(y_range=(0, 1))
+                    ly = linear.best_fit
+                    qy = quadratic.best_fit
+                    ey = exponential.best_fit
+
+                    f.scatter(x=x, y=y)
+                    f.line(x=x, y=ly, line_color="red", legend_label="Linear")
+                    f.line(x=x, y=qy, line_color="orange", legend_label="Quadratic")
+                    f.line(x=x, y=ey, line_color="purple", legend_label="Exponential")
+                    show(f)
+
+    def run(self):
         plots = {}
+
+        self.data.hvplot(
+            by=['estimator'],
+            groupby=['preprocessor', 'compressor'],
+            kind='scatter',
+            x='ratio',
+            y=['metric'],
+            legend='bottom_right',
+            widget_location='bottom',
+        )
 
         # for compressor in self.data["compressor"].unique():
         #     for estimator in self.data["estimator"].unique():
@@ -142,4 +175,4 @@ if __name__ == "__main__":
     else:
         analyze.load(args.input_dir / "benchmark.sqlite")
 
-    analyze.run()
+    analyze.run_fit()

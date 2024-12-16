@@ -82,7 +82,7 @@ class BenchmarkDatabase:
                 file_hash REFERENCES files(file_hash) NOT NULL, 
                 preprocessor_id REFERENCES preprocessors(preprocessor_id) NOT NULL,
                 estimator_id REFERENCES estimators(estimator_id) NOT NULL, 
-                metric BLOB
+                metric REAL
             )""")
         self.con.commit()
         self.con.execute(
@@ -193,7 +193,8 @@ class BenchmarkDatabase:
                                                           (SELECT estimator_id FROM estimators WHERE name=?),
                                                           ?)""",
                 (result.input_file.hash, result.preprocessor.name, result.estimator.name,
-                 pickle.dumps(result.value, protocol=pickle.HIGHEST_PROTOCOL))
+                 result.value if isinstance(result.value, (int, float, complex)) and not isinstance(result.value,
+                                                                                                    bool) else None)
             )
             self.con.commit()
         except sqlite3.Error as e:
@@ -221,7 +222,8 @@ class BenchmarkDatabase:
                                  file_ratios.ratio as ratio,
                                  file_estimations.metric as metric
                           FROM file_ratios
-                                 LEFT OUTER JOIN file_estimations on file_ratios.file_hash = file_estimations.file_hash""")
+                                 LEFT OUTER JOIN file_estimations on file_ratios.file_hash = file_estimations.file_hash
+                          WHERE metric IS NOT NULL""")
         return cursor.description, cursor.fetchall()
 
     @staticmethod
@@ -278,3 +280,8 @@ class BenchmarkDatabase:
 
         logging.info(
             f"Calculated {completed_ratio_tasks} compression ratios in {default_timer() - ratio_start_time:.3f} seconds")
+
+    # def check_estimation_done(self, preprocessor: str, estimator: str, compressor: Compressor) -> bool:
+    #     return self.con.execute("""SELECT COUNT(1) FROM file_estimations WHERE
+    #                                file_estimations.preprocessor_id=(SELECT preprocessor_id from preprocessors WHERE name=?) AND
+    #     """, ()).fetchone() > 0
