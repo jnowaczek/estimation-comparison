@@ -25,6 +25,7 @@ from estimation_comparison.data_collection.preprocessor import BaseSampler
 InputFile = NamedTuple("InputFile", [("hash", str), ("path", str), ("name", str)])
 
 Ratio = NamedTuple("Ratio", [("hash", str), ("algorithm", str), ("ratio", float)])
+CompressionResult = NamedTuple("CompressionResult", [("hash", str), ("algorithm", str), ("size_bytes", int)])
 Metric = NamedTuple("Metric", [("hash", str), ("estimator", str), ("metric", bytes)])
 
 FriendlyRatio = NamedTuple("Ratio", [("file_name", str), ("algorithm", str), ("ratio", float)])
@@ -48,14 +49,16 @@ class Preprocessor:
     name: str
     instance: BaseSampler[np.ndarray]
 
+
 @dataclass
 class LoadedData:
     data: np.ndarray
     completed_stages: List[str]
     input_file: InputFile
 
+
 @dataclass
-class IntermediateResult:
+class IntermediateEstimationResult:
     data: np.ndarray
     completed_stages: List[str]
     input_file: InputFile
@@ -63,7 +66,7 @@ class IntermediateResult:
 
 
 @dataclass
-class Result:
+class EstimationResult:
     value: int | float
     completed_stages: List[str]
     input_file: InputFile
@@ -71,6 +74,6 @@ class Result:
     estimator: Estimator
 
     @classmethod
-    def from_intermediate_result(cls, ir: IntermediateResult, value: int | float, estimator: Estimator) -> Self:
-        return Result(value=value, completed_stages=ir.completed_stages + [estimator.name], input_file=ir.input_file,
-                      preprocessor=ir.preprocessor, estimator=estimator)
+    def from_intermediate_result(cls, ir: IntermediateEstimationResult, value: int | float, estimator: Estimator) -> Self:
+        return EstimationResult(value=value, completed_stages=ir.completed_stages + [estimator.name], input_file=ir.input_file,
+                                preprocessor=ir.preprocessor, estimator=estimator)

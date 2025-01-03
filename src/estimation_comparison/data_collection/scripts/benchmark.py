@@ -30,8 +30,8 @@ from estimation_comparison.data_collection.preprocessor import NoopSampler, Patc
 from estimation_comparison.data_collection.preprocessor.linear_sample import LinearSampler
 from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch
 from estimation_comparison.database import BenchmarkDatabase
-from estimation_comparison.model import Compressor, Estimator, Preprocessor, InputFile, IntermediateResult, \
-    Result, LoadedData
+from estimation_comparison.model import Compressor, Estimator, Preprocessor, InputFile, IntermediateEstimationResult, \
+    EstimationResult, LoadedData
 
 
 class Benchmark:
@@ -42,17 +42,13 @@ class Benchmark:
         self.database = BenchmarkDatabase(Path(self.output_dir) / "benchmark.sqlite")
 
         self._preprocessors: List[Preprocessor] = [
-            # Preprocessor(name="noop", instance=NoopSampler()),
-            # Preprocessor(name="patch_random_10%", instance=PatchSampler(fraction=0.1)),
-            # Preprocessor(name="patch_random_20%", instance=PatchSampler(fraction=0.2)),
-            # Preprocessor(name="patch_random_40%", instance=PatchSampler(fraction=0.4)),
-            # Preprocessor(name="patch_random_60%", instance=PatchSampler(fraction=0.6)),
-            # Preprocessor(name="patch_random_80%", instance=PatchSampler(fraction=0.8)),
-            Preprocessor(name="linear_random_10%", instance=LinearSampler(fraction=0.1)),
-            Preprocessor(name="linear_random_20%", instance=LinearSampler(fraction=0.2)),
-            Preprocessor(name="linear_random_40%", instance=LinearSampler(fraction=0.4)),
-            Preprocessor(name="linear_random_60%", instance=LinearSampler(fraction=0.6)),
-            Preprocessor(name="linear_random_80%", instance=LinearSampler(fraction=0.8)),
+            Preprocessor(name="entire_file", instance=NoopSampler()),
+            Preprocessor(name="patch_random_25%", instance=PatchSampler(fraction=0.25)),
+            Preprocessor(name="patch_random_50%", instance=PatchSampler(fraction=0.5)),
+            Preprocessor(name="patch_random_75%", instance=PatchSampler(fraction=0.75)),
+            Preprocessor(name="linear_random_25%", instance=LinearSampler(fraction=0.25)),
+            Preprocessor(name="linear_random_50%", instance=LinearSampler(fraction=0.5)),
+            Preprocessor(name="linear_random_75%", instance=LinearSampler(fraction=0.75)),
         ]
 
         self._estimators: List[Estimator] = [
@@ -118,8 +114,8 @@ class Benchmark:
         self.database.update_preprocessors(self._preprocessors)
         logging.info("Updating benchmark database file hash list")
         self.database.update_files(self.client, self.data_locations)
-        logging.info("Updating benchmark database compression ratios")
-        self.database.update_ratios(self.client, self._compressors)
+        logging.info("Updating benchmark database compression results")
+        self.database.update_compression_results(self.client, self._compressors)
 
     @staticmethod
     def _load_file(file: InputFile) -> LoadedData:
@@ -135,15 +131,15 @@ class Benchmark:
             logging.exception(f"Error reading {file}: {e}")
 
     @staticmethod
-    def _preprocess_file(preprocessor: Preprocessor, data: LoadedData) -> IntermediateResult:
-        return IntermediateResult(preprocessor.instance.run(data.data),
-                                  completed_stages=data.completed_stages + [preprocessor.name],
-                                  input_file=data.input_file, preprocessor=preprocessor)
+    def _preprocess_file(preprocessor: Preprocessor, data: LoadedData) -> IntermediateEstimationResult:
+        return IntermediateEstimationResult(preprocessor.instance.run(data.data),
+                                            completed_stages=data.completed_stages + [preprocessor.name],
+                                            input_file=data.input_file, preprocessor=preprocessor)
 
     @staticmethod
-    def _run_estimator(estimator: Estimator, ir: IntermediateResult) -> Result:
+    def _run_estimator(estimator: Estimator, ir: IntermediateEstimationResult) -> EstimationResult:
         try:
-            return Result.from_intermediate_result(ir, estimator.instance.run(ir.data), estimator)
+            return EstimationResult.from_intermediate_result(ir, estimator.instance.run(ir.data), estimator)
         except Exception as e:
             logging.exception(f"Error estimating {ir.input_file}: {e}")
 

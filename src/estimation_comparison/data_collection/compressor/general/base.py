@@ -22,8 +22,5 @@ class GeneralCompressorBase(AlgorithmBase):
     def compress(self, data: bytes) -> bytes:
         pass
 
-    def ratio(self, data: bytes) -> float:
-        return len(data) / len(self.compress(data))
-
-    def run(self, data: bytes) -> float:
-        return self.ratio(data)
+    def run(self, data: bytes) -> int:
+        return len(self.compress(data))

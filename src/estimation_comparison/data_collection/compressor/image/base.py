@@ -24,8 +24,5 @@ class ImageCompressorBase(HasTraits):
     def compress(self, data: np.ndarray) -> bytes:
         pass
 
-    def ratio(self, data: np.ndarray) -> float:
-        return len(data) / len(self.compress(data))
-
     def run(self, data: np.ndarray) -> float:
-        return self.ratio(data)
+        return len(self.compress(data))

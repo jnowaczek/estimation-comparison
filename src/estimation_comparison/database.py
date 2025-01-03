@@ -37,7 +37,7 @@ from typing import Tuple, List
 import dask.distributed
 
 from estimation_comparison.model import InputFile, Ratio, FriendlyRatio, FriendlyMetric, Compressor, Estimator, \
-    Preprocessor, Result
+    Preprocessor, EstimationResult, CompressionResult
 
 
 class BenchmarkDatabase:
@@ -64,10 +64,10 @@ class BenchmarkDatabase:
         # self.cur.execute(
         #     "CREATE TABLE file_tags(file_hash REFERENCES files(file_hash), tag_id REFERENCES tag_types(tag_id))")
         self.con.execute(
-            """CREATE TABLE IF NOT EXISTS file_ratios(
+            """CREATE TABLE IF NOT EXISTS compression_results(
                 file_hash REFERENCES files(file_hash) NOT NULL, 
                 compressor_id REFERENCES compressors(compressor_id) NOT NULL, 
-                ratio FLOAT
+                size_bytes INTEGER
             )""")
         self.con.commit()
         self.con.execute(
@@ -120,11 +120,11 @@ class BenchmarkDatabase:
         except sqlite3.Error as e:
             logging.exception(e)
 
-    def update_ratio(self, new_ratio: Ratio):
+    def update_compression_result(self, new_result: CompressionResult):
         try:
             self.con.execute(
-                """INSERT INTO file_ratios VALUES(:hash, (SELECT compressor_id FROM compressors WHERE name=:compressor_name), :ratio)""",
-                new_ratio
+                """INSERT INTO compression_results VALUES(:hash, (SELECT compressor_id FROM compressors WHERE name=:compressor_name), :size_bytes)""",
+                new_result
             )
             self.con.commit()
         except sqlite3.Error as e:
@@ -137,27 +137,27 @@ class BenchmarkDatabase:
     def input_file_count(self) -> int:
         return self.con.execute("SELECT COUNT(*) FROM files").fetchone()[0]
 
-    def get_ratios_for_file(self, file_hash: str):
-        ratios = []
+    def get_compression_results_for_file(self, file_hash: str):
+        results = []
         for row in self.con.execute(
                 """SELECT file_hash,
-                 (SELECT name FROM compressors WHERE file_ratios.compressor_id=compressors.compressor_id),
-                 ratio
-                 FROM file_ratios WHERE file_hash = ?""",
+                 (SELECT name FROM compressors WHERE compression_results.compressor_id=compressors.compressor_id),
+                 size_bytes
+                 FROM compression_results WHERE file_hash = ?""",
                 (file_hash,)).fetchall():
-            ratios.append(Ratio(*row))
-        return ratios
+            results.append(CompressionResult(*row))
+        return results
 
-    def get_all_ratios(self):
-        ratios = []
+    def get_all_compression_results(self):
+        results = []
         for row in self.con.execute(
                 """SELECT 
-                   (SELECT name FROM files where file_ratios.file_hash=files.file_hash),
-                   (SELECT name FROM compressors WHERE file_ratios.compressor_id=compressors.compressor_id),
-                   ratio
-                   FROM file_ratios""").fetchall():
-            ratios.append(FriendlyRatio(*row, ))
-        return ratios
+                   (SELECT name FROM files where compression_results.file_hash=files.file_hash),
+                   (SELECT name FROM compressors WHERE compression_results.compressor_id=compressors.compressor_id),
+                   size_bytes
+                   FROM compression_results""").fetchall():
+            results.append(FriendlyRatio(*row, ))
+        return results
 
     def update_estimators(self, estimators: List[Estimator]):
         try:
@@ -185,7 +185,7 @@ class BenchmarkDatabase:
         except sqlite3.Error as e:
             logging.exception(e)
 
-    def update_result(self, result: Result):
+    def update_result(self, result: EstimationResult):
         try:
             self.con.execute(
                 """INSERT INTO file_estimations VALUES(?, 
@@ -248,38 +248,38 @@ class BenchmarkDatabase:
             self.update_file(InputFile(result, future.context[0], future.context[1]))
 
     @staticmethod
-    def _ratio_file(compressor: Compressor, f: InputFile) -> Tuple[InputFile, Compressor, float]:
+    def _compress_file(compressor: Compressor, f: InputFile) -> Tuple[InputFile, Compressor, float]:
         try:
             with open(f.path, "rb") as fd:
                 return f, compressor, compressor.instance.run(fd.read())
         except ValueError as e:
             logging.warning(e)
 
-    def update_ratios(self, client: dask.distributed.Client, compressors: List[Compressor]):
+    def update_compression_results(self, client: dask.distributed.Client, compressors: List[Compressor]):
         ratio_start_time = default_timer()
-        ratio_tasks = []
-        submitted_ratio_tasks = 0
-        completed_ratio_tasks = 0
+        compression_tasks = []
+        submitted_compression_tasks = 0
+        completed_compression_tasks = 0
 
         for f in self.get_all_files():
-            ratios: {str: float} = {x.algorithm: x.ratio for x in self.get_ratios_for_file(f.hash)}
+            ratios: {str: float} = {x.algorithm: x.size_bytes for x in self.get_compression_results_for_file(f.hash)}
 
             for c in compressors:
                 if c.name not in ratios.keys():
                     # noinspection PyTypeChecker
-                    future = client.submit(self._ratio_file, c, f)
-                    ratio_tasks.append(future)
-                    submitted_ratio_tasks += 1
+                    future = client.submit(self._compress_file, c, f)
+                    compression_tasks.append(future)
+                    submitted_compression_tasks += 1
 
-        for future, result in dask.distributed.as_completed(ratio_tasks, with_results=True):
-            self.update_ratio(
-                Ratio(result[0].hash, result[1].name, result[2]))
-            completed_ratio_tasks += 1
+        for future, result in dask.distributed.as_completed(compression_tasks, with_results=True):
+            self.update_compression_result(
+                CompressionResult(result[0].hash, result[1].name, result[2]))
+            completed_compression_tasks += 1
             logging.info(
-                f"{completed_ratio_tasks}/{submitted_ratio_tasks} tasks complete, {completed_ratio_tasks / submitted_ratio_tasks * 100:.2f}%")
+                f"{completed_compression_tasks}/{submitted_compression_tasks} tasks complete, {completed_compression_tasks / submitted_compression_tasks * 100:.2f}%")
 
         logging.info(
-            f"Calculated {completed_ratio_tasks} compression ratios in {default_timer() - ratio_start_time:.3f} seconds")
+            f"Calculated {completed_compression_tasks} compression ratios in {default_timer() - ratio_start_time:.3f} seconds")
 
     # def check_estimation_done(self, preprocessor: str, estimator: str, compressor: Compressor) -> bool:
     #     return self.con.execute("""SELECT COUNT(1) FROM file_estimations WHERE
