@@ -14,51 +14,57 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import unittest
 
+import numpy as np
+
 from estimation_comparison.data_collection.estimator.byte_count import ByteCount
 
 
 class BasicByteCountTests(unittest.TestCase):
-    kilobyte = ByteCount({"block_size": 1024})
-    half_kilobyte = ByteCount({"block_size": 512})
-    quarter_kilobyte = ByteCount({"block_size": 256})
+    kilobyte = ByteCount(block_size=1024)
+    half_kilobyte = ByteCount(block_size=512)
+    quarter_kilobyte = ByteCount(block_size=256)
 
     def test_zeros_kilo(self):
-        result = self.kilobyte.estimate(b"0" * 1024)
-        self.assertEqual(result, [1])
+        result = self.kilobyte.estimate(np.frombuffer(b"0" * 1024, dtype=np.uint8))
+        self.assertEqual([1], result)
 
     def test_count_kilo(self):
         data = bytes(range(256)) * 4
-        result = self.kilobyte.estimate(data)
-        self.assertEqual(result, [0])
+        result = self.kilobyte.estimate(np.frombuffer(data, dtype=np.uint8))
+        self.assertEqual([0], result)
 
     def test_zeros_half(self):
-        result = self.half_kilobyte.estimate(b"0" * 1024)
-        self.assertEqual(result, [1, 1])
+        result = self.half_kilobyte.estimate(np.frombuffer(b"0" * 1024, dtype=np.uint8))
+        self.assertEqual([1, 1], result)
 
     def test_count_half(self):
-        result = self.half_kilobyte.estimate(bytes(range(256)) * 4)
-        self.assertEqual(result, [0, 0])
+        result = self.half_kilobyte.estimate(np.frombuffer(bytes(range(256)) * 4, dtype=np.uint8))
+        self.assertEqual([0, 0], result)
 
     def test_zeros_quarter(self):
-        result = self.quarter_kilobyte.estimate(b"0" * 1024)
-        self.assertEqual(result, [1, 1, 1, 1])
+        result = self.quarter_kilobyte.estimate(np.frombuffer(b"0" * 1024, dtype=np.uint8))
+        self.assertEqual([1, 1, 1, 1], result)
 
     def test_count_quarter(self):
-        result = self.quarter_kilobyte.estimate(bytes(range(256)) * 4)
-        self.assertEqual(result, [0, 0, 0, 0])
+        result = self.quarter_kilobyte.estimate(np.frombuffer(bytes(range(256)) * 4, dtype=np.uint8))
+        self.assertEqual([0, 0, 0, 0], result)
 
 
 class SingleBlockByteCountTests(unittest.TestCase):
-    single_block = ByteCount({"block_size": None})
+    single_block = ByteCount(block_size=None)
 
     def test_zeros_5k(self):
-        result = self.single_block.estimate(b"0" * 1024 * 5)
-        self.assertEqual(result, [1])
+        result = self.single_block.estimate(np.frombuffer(b"0" * 1024 * 5, dtype=np.uint8))
+        self.assertEqual([1], result)
+
+    def test_two_numbers_5k(self):
+        result = self.single_block.estimate(np.frombuffer((b"0" * 512 + b"1" * 512) * 5, dtype=np.uint8))
+        self.assertEqual([2], result)
 
     def test_count_5k(self):
-        data = bytes(range(256)) * 4 * 5
+        data = np.frombuffer(bytes(range(256)) * 4 * 5, dtype=np.uint8)
         result = self.single_block.estimate(data)
-        self.assertEqual(result, [0])
+        self.assertEqual([0], result)
 
 
 if __name__ == '__main__':
