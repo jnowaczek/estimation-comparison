@@ -36,7 +36,7 @@ class ByteCount(EstimatorBase):
             uniques, counts = np.unique(block, return_counts=True)
 
             # Use actual block size in case we get a small block at the end
-            threshold = len(block) / 256
+            threshold = len(block) // 256
             results.append(len(np.where(counts > threshold)[0]))
 
         return results
