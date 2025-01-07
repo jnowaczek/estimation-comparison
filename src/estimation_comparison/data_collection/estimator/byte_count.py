@@ -15,6 +15,7 @@
 import array
 import itertools
 
+import numpy as np
 # noinspection PyProtectedMember
 from traitlets import Int
 
@@ -24,21 +25,18 @@ from estimation_comparison.data_collection.estimator.base import EstimatorBase
 class ByteCount(EstimatorBase):
     block_size = Int(None, allow_none=True)
 
-    def estimate(self, data: bytes) -> [int]:
-        blocks = [data]
+    def estimate(self, data: np.ndarray) -> [int]:
+        if self.block_size:
+            data = data.reshape((-1, self.block_size))
+        else:
+            data = data.reshape((1, -1))
         results = []
 
-        if self.block_size is not None:
-            blocks = itertools.batched(data, self.block_size)
-
-        for block in blocks:
-            appearances = array.array("L", [0] * 256)
-
-            for byte in block:
-                appearances[byte] += 1
+        for block in data:
+            uniques, counts = np.unique(block, return_counts=True)
 
             # Use actual block size in case we get a small block at the end
-            threshold = len(block) / len(appearances)
-            results.append(len(list(filter(lambda x: x >= threshold, appearances.tolist()))))
+            threshold = len(block) / 256
+            results.append(len(np.where(counts > threshold)[0]))
 
         return results

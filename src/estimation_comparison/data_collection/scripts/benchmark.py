@@ -60,34 +60,7 @@ class Benchmark:
                     file_summary_fn=np.mean
                 )
             ),
-            # "autocorrelation_1k_64_notch_max": Autocorrelation(
-            #     block_summary_fn=functools.partial(max_outside_middle_notch, notch_width=64),
-            #     file_summary_fn=np.max),
-            # "autocorrelation_1k_768_cutoff_mean": Autocorrelation(
-            #     block_summary_fn=functools.partial(proportion_below_cutoff, cutoff=768),
-            #     file_summary_fn=np.mean),
-            # "autocorrelation_1k_896_cutoff_mean": Autocorrelation(
-            #     block_summary_fn=functools.partial(proportion_below_cutoff, cutoff=896),
-            #     file_summary_fn=np.mean),
-            # "autocorrelation_1k_768_cutoff_max": Autocorrelation(
-            #     block_summary_fn=functools.partial(proportion_below_cutoff, cutoff=768),
-            #     file_summary_fn=np.max),
-            # "autocorrelation_1k_896_cutoff_max": Autocorrelation(
-            #     block_summary_fn=functools.partial(max_below_cutoff, cutoff=896),
-            #     file_summary_fn=np.max),
-            # "autocorrelation_1k_768_cutoff_max_mean": Autocorrelation(
-            #     block_summary_fn=functools.partial(max_below_cutoff, cutoff=768),
-            #     file_summary_fn=np.mean),
-            # "autocorrelation_1k_896_cutoff_max_mean": Autocorrelation(
-            #     block_summary_fn=functools.partial(max_below_cutoff, cutoff=896),
-            #     file_summary_fn=np.mean),
-            # "autocorrelation_1k_768_cutoff_max_max": Autocorrelation(
-            #     block_summary_fn=functools.partial(max_below_cutoff, cutoff=768),
-            #     file_summary_fn=np.max),
-            # "autocorrelation_1k_896_cutoff_max_max": Autocorrelation(
-            #     block_summary_fn=functools.partial(max_below_cutoff, cutoff=896),
-            #     file_summary_fn=np.max),
-            # "bytecount_file": ByteCount(),
+            Estimator(name="bytecount_file", instance=ByteCount()),
             Estimator(name="entropy_bits", instance=Entropy()),
         ]
 
@@ -104,6 +77,8 @@ class Benchmark:
         ]
 
         self.client = Client()
+        self.client.amm.start()
+        logging.info(f"Dask dashboard available: {self.client.dashboard_link}")
 
     def update_database(self):
         logging.info("Updating benchmark database compressor list")
@@ -154,7 +129,7 @@ class Benchmark:
         preprocessed = []
         for p in self._preprocessors:
             for file in loaded_files:
-                preprocessed.append(self.client.submit(functools.partial(self._preprocess_file, p), file, priority=5))
+                preprocessed.append(self.client.submit(functools.partial(self._preprocess_file, p), file, priority=0))
         # preprocessed = self.client.map(self._preprocess_file, self._preprocessors, loaded_files)
         del loaded_files
 

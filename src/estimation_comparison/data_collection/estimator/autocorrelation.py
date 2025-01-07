@@ -37,7 +37,8 @@ class Autocorrelation(EstimatorBase):
             numerator = signal.correlate(normalized_block, normalized_block)
             denominator = np.sum(normalized_block * normalized_block)
             del normalized_block
-            block_result = numerator / denominator
+            block_result = np.divide(numerator, denominator, out=np.zeros_like(numerator), where=denominator != 0,
+                                     dtype=float)
             del numerator, denominator
             block_result = self.block_summary_fn(block_result)
             acf.append(block_result)
