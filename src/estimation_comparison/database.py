@@ -159,6 +159,24 @@ class BenchmarkDatabase:
             results.append(FriendlyRatio(*row, ))
         return results
 
+    def get_missing_compression_results(self):
+        return self.con.execute(
+            """
+            SELECT combi.file_name, combi.compressor_name
+            FROM (
+                SELECT DISTINCT 
+                    file_hash, 
+                    compressor_id, 
+                    files.name AS file_name, 
+                    compressors.name AS compressor_name
+                FROM files
+                CROSS JOIN compressors
+            ) combi
+            LEFT JOIN compression_results c ON c.file_hash = combi.file_hash AND c.compressor_id = combi.compressor_id
+            WHERE c.size_bytes IS NULL"""
+        ).fetchall()
+
+
     def update_estimators(self, estimators: List[Estimator]):
         try:
             estimator_list = []
@@ -279,7 +297,7 @@ class BenchmarkDatabase:
                 f"{completed_compression_tasks}/{submitted_compression_tasks} tasks complete, {completed_compression_tasks / submitted_compression_tasks * 100:.2f}%")
 
         logging.info(
-            f"Calculated {completed_compression_tasks} compression ratios in {default_timer() - ratio_start_time:.3f} seconds")
+            f"Calculated {completed_compression_tasks} new compression ratios in {default_timer() - ratio_start_time:.3f} seconds")
 
     # def check_estimation_done(self, preprocessor: str, estimator: str, compressor: Compressor) -> bool:
     #     return self.con.execute("""SELECT COUNT(1) FROM file_estimations WHERE

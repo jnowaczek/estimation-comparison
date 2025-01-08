@@ -17,12 +17,12 @@ from lmfit.models import ExponentialModel, LinearModel, QuadraticModel
 
 def linear_fit(x, y):
     model = LinearModel()
-    params = model.make_params(intercept=dict(value=0, vary=False))
+    params = model.make_params()
     return model.fit(y, x=x, params=params)
 
 def quadratic_fit(x, y):
     model = QuadraticModel()
-    params = model.make_params(c=dict(value=0, vary=False))
+    params = model.make_params()
     return model.fit(y, x=x, params=params)
 
 def exponential_fit(x, y):

@@ -51,6 +51,7 @@ class Analyze:
         description, records = self.database.get_dataframe()
 
         self.data = pd.DataFrame().from_records(records, columns=[item[0] for item in description])
+        self.data["percent_reduction"] = self.data["metric"] ** -1 * 100
         logging.info(f"Loaded {self.data.shape} dataframe")
 
     def load(self, filename: Path):
@@ -87,14 +88,14 @@ class Analyze:
                 subset = subset.sort_values("ratio")
 
                 if not subset.empty:
-                    x = subset.ratio.tolist()
-                    y = subset.metric.tolist()
+                    y = subset.ratio.tolist()
+                    x = subset.metric.tolist()
 
                     linear = linear_fit(x, y)
                     quadratic = quadratic_fit(x, y)
                     exponential = exponential_fit(x, y)
 
-                    f = figure(y_range=(0, 1))
+                    f = figure(y_range=(0, 1), title=f"{e} - {p} - {c}", x_range=(0, 20))
                     ly = linear.best_fit
                     qy = quadratic.best_fit
                     ey = exponential.best_fit

@@ -137,9 +137,12 @@ class Benchmark:
         for e in self._estimators:
             for future in preprocessed:
                 try:
-                    # noinspection PyTypeChecker
-                    results.append(
-                        self.client.submit(functools.partial(self._run_estimator, e), future, priority=10))
+                    if not self.database.get_all_metric():
+                        # noinspection PyTypeChecker
+                        results.append(
+                            self.client.submit(functools.partial(self._run_estimator, e), future, priority=10))
+                    else:
+                        completed_tasks += 1
                 except Exception as ex:
                     logging.exception(f"Running estimator raised exception\n\t{ex})")
         del preprocessed
