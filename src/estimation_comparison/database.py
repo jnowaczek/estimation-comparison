@@ -36,7 +36,7 @@ from typing import Tuple, List
 
 import dask.distributed
 
-from estimation_comparison.model import InputFile, Ratio, FriendlyRatio, FriendlyMetric, Compressor, Estimator, \
+from estimation_comparison.model import InputFile, FriendlyRatio, FriendlyMetric, Compressor, Estimator, \
     Preprocessor, EstimationResult, CompressionResult
 
 
@@ -159,23 +159,54 @@ class BenchmarkDatabase:
             results.append(FriendlyRatio(*row, ))
         return results
 
-    def get_missing_compression_results(self):
-        return self.con.execute(
-            """
-            SELECT combi.file_name, combi.compressor_name
-            FROM (
-                SELECT DISTINCT 
-                    file_hash, 
-                    compressor_id, 
-                    files.name AS file_name, 
-                    compressors.name AS compressor_name
-                FROM files
-                CROSS JOIN compressors
-            ) combi
-            LEFT JOIN compression_results c ON c.file_hash = combi.file_hash AND c.compressor_id = combi.compressor_id
-            WHERE c.size_bytes IS NULL"""
-        ).fetchall()
+    def get_missing_compression_results(self) -> (InputFile, str):
+        results = []
+        for row in self.con.execute(
+                """
+                SELECT combi.file_hash, combi.file_path, combi.file_name, combi.compressor_name
+                FROM (
+                    SELECT DISTINCT 
+                        file_hash, 
+                        compressor_id, 
+                        files.name AS file_name,
+                        files.path AS file_path,
+                        compressors.name AS compressor_name
+                    FROM files
+                    CROSS JOIN compressors
+                ) combi
+                LEFT JOIN compression_results c ON 
+                    c.file_hash = combi.file_hash AND c.compressor_id = combi.compressor_id
+                WHERE c.size_bytes IS NULL"""
+        ).fetchall():
+            results.append((InputFile(row[0], row[1], row[2]), row[3]))
+        return results
 
+    def get_missing_estimation_results(self) -> (InputFile, str, str):
+        results = []
+        for row in self.con.execute(
+                """
+                SELECT combi.file_hash, combi.file_path, combi.file_name, combi.preprocessor_name, combi.estimator_name
+                FROM (
+                    SELECT DISTINCT 
+                        file_hash, 
+                        estimator_id,
+                        preprocessor_id,
+                        files.name AS file_name,
+                        files.path AS file_path,
+                        preprocessors.name AS preprocessor_name,
+                        estimators.name AS estimator_name
+                    FROM files
+                    CROSS JOIN estimators
+                    CROSS JOIN preprocessors
+                ) combi
+                LEFT JOIN file_estimations e ON 
+                    e.file_hash = combi.file_hash AND 
+                    e.preprocessor_id == combi.preprocessor_id AND 
+                    e.estimator_id = combi.estimator_id
+                WHERE e.metric IS NULL"""
+        ).fetchall():
+            results.append((InputFile(row[0], row[1], row[2]), row[3], row[4]))
+        return results
 
     def update_estimators(self, estimators: List[Estimator]):
         try:
@@ -233,14 +264,14 @@ class BenchmarkDatabase:
 
     def get_dataframe(self):
         cursor = self.con.cursor()
-        cursor.execute("""SELECT (SELECT name FROM files WHERE file_ratios.file_hash = files.file_hash) as filename,
+        cursor.execute("""SELECT (SELECT name FROM files WHERE compression_results.file_hash = files.file_hash) as filename,
                                  (SELECT name FROM preprocessors WHERE file_estimations.preprocessor_id = preprocessors.preprocessor_id) as preprocessor,
                                  (SELECT name FROM estimators WHERE file_estimations.estimator_id = estimators.estimator_id) as estimator,
-                                 (SELECT name FROM compressors WHERE file_ratios.compressor_id = compressors.compressor_id) as compressor,
-                                 file_ratios.ratio as ratio,
+                                 (SELECT name FROM compressors WHERE compression_results.compressor_id = compressors.compressor_id) as compressor,
+                                 compression_results.size_bytes as size_bytes,
                                  file_estimations.metric as metric
-                          FROM file_ratios
-                                 LEFT OUTER JOIN file_estimations on file_ratios.file_hash = file_estimations.file_hash
+                          FROM compression_results
+                                 LEFT OUTER JOIN file_estimations on compression_results.file_hash = file_estimations.file_hash
                           WHERE metric IS NOT NULL""")
         return cursor.description, cursor.fetchall()
 
@@ -279,15 +310,11 @@ class BenchmarkDatabase:
         submitted_compression_tasks = 0
         completed_compression_tasks = 0
 
-        for f in self.get_all_files():
-            ratios: {str: float} = {x.algorithm: x.size_bytes for x in self.get_compression_results_for_file(f.hash)}
-
-            for c in compressors:
-                if c.name not in ratios.keys():
-                    # noinspection PyTypeChecker
-                    future = client.submit(self._compress_file, c, f)
-                    compression_tasks.append(future)
-                    submitted_compression_tasks += 1
+        for job in self.get_missing_compression_results():
+            future = client.submit(self._compress_file,
+                                   next(filter(lambda x: x.name == job[1], compressors)), job[0])
+            compression_tasks.append(future)
+            submitted_compression_tasks += 1
 
         for future, result in dask.distributed.as_completed(compression_tasks, with_results=True):
             self.update_compression_result(

@@ -77,7 +77,6 @@ class Benchmark:
         ]
 
         self.client = Client()
-        self.client.amm.start()
         logging.info(f"Dask dashboard available: {self.client.dashboard_link}")
 
     def update_database(self):
@@ -120,37 +119,50 @@ class Benchmark:
 
     def run(self):
         start_time = default_timer()
-        num_tasks = self.database.input_file_count * len(self._estimators) * len(self._preprocessors)
         completed_tasks = 0
 
-        input_files = self.database.get_all_files()
-        loaded_files = self.client.map(self._load_file, input_files, priority=0)
+        estimation_tasks = self.database.get_missing_estimation_results()
+        estimation_results = []
 
-        preprocessed = []
-        for p in self._preprocessors:
-            for file in loaded_files:
-                preprocessed.append(self.client.submit(functools.partial(self._preprocess_file, p), file, priority=0))
-        # preprocessed = self.client.map(self._preprocess_file, self._preprocessors, loaded_files)
-        del loaded_files
+        for file, preprocessor_name, estimator_name in estimation_tasks:
+            loaded_file = self.client.submit(self._load_file, file)
 
-        results = []
-        for e in self._estimators:
-            for future in preprocessed:
-                try:
-                    if not self.database.get_all_metric():
-                        # noinspection PyTypeChecker
-                        results.append(
-                            self.client.submit(functools.partial(self._run_estimator, e), future, priority=10))
-                    else:
-                        completed_tasks += 1
-                except Exception as ex:
-                    logging.exception(f"Running estimator raised exception\n\t{ex})")
-        del preprocessed
+            preprocessor_instance = next(filter(lambda x: x.name == preprocessor_name, self._preprocessors))
+            preprocessed = self.client.submit(self._preprocess_file, preprocessor=preprocessor_instance,
+                                              data=loaded_file)
 
-        for future, result in as_completed(results, with_results=True):
+            estimator_instance = next(filter(lambda x: x.name == estimator_name, self._estimators))
+            estimation_results.append(
+                self.client.submit(self._run_estimator, estimator=estimator_instance, ir=preprocessed))
+
+        # input_files = self.database.get_all_files()
+        # loaded_files = self.client.map(self._load_file, input_files, priority=0)
+        #
+        # preprocessed = []
+        # for p in self._preprocessors:
+        #     for file in loaded_files:
+        #         preprocessed.append(self.client.submit(functools.partial(self._preprocess_file, p), file, priority=0))
+        # # preprocessed = self.client.map(self._preprocess_file, self._preprocessors, loaded_files)
+        # del loaded_files
+        #
+        # results = []
+        # for e in self._estimators:
+        #     for future in preprocessed:
+        #         try:
+        #             if not self.database.get_all_metric():
+        #                 # noinspection PyTypeChecker
+        #                 results.append(
+        #                     self.client.submit(functools.partial(self._run_estimator, e), future, priority=10))
+        #             else:
+        #                 completed_tasks += 1
+        #         except Exception as ex:
+        #             logging.exception(f"Running estimator raised exception\n\t{ex})")
+        # del preprocessed
+
+        for future, result in as_completed(estimation_results, with_results=True):
             completed_tasks += 1
             logging.info(
-                f"{completed_tasks}/{num_tasks} estimation tasks complete, {completed_tasks / len(results) * 100:.2f}%")
+                f"{completed_tasks}/{len(estimation_tasks)} estimation tasks complete, {completed_tasks / len(estimation_tasks) * 100:.2f}%")
             try:
                 self.database.update_result(result)
                 # self.database.update_metric(
@@ -161,8 +173,6 @@ class Benchmark:
                 #     f"{future.context["estimator_name"]}": future.result()}
             except Exception as e:
                 logging.exception(f"Input file '{result.input_file.name}' raised exception\n\t{e}")
-
-        del results
 
         logging.info(f"Estimation completed in {default_timer() - start_time:.3f} seconds")
         logging.info(f"Benchmark completed in {default_timer() - self._init_time:.3f} seconds")
