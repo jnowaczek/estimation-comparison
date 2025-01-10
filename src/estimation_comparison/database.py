@@ -174,7 +174,7 @@ class BenchmarkDatabase:
                     FROM files
                     CROSS JOIN compressors
                 ) combi
-                LEFT JOIN compression_results c ON 
+                LEFT JOIN compression_results AS c ON 
                     c.file_hash = combi.file_hash AND c.compressor_id = combi.compressor_id
                 WHERE c.size_bytes IS NULL"""
         ).fetchall():
@@ -185,8 +185,8 @@ class BenchmarkDatabase:
         results = []
         for row in self.con.execute(
                 """
-                SELECT combi.file_hash, combi.file_path, combi.file_name, combi.preprocessor_name, combi.estimator_name
-                FROM (
+                SELECT final.file_hash, final.file_path, final.file_name, final.preprocessor_name, final.estimator_name
+                FROM ((
                     SELECT DISTINCT 
                         file_hash, 
                         estimator_id,
@@ -198,12 +198,12 @@ class BenchmarkDatabase:
                     FROM files
                     CROSS JOIN estimators
                     CROSS JOIN preprocessors
-                ) combi
-                LEFT JOIN file_estimations e ON 
-                    e.file_hash = combi.file_hash AND 
-                    e.preprocessor_id == combi.preprocessor_id AND 
-                    e.estimator_id = combi.estimator_id
-                WHERE e.metric IS NULL"""
+                ) AS perm
+                LEFT JOIN file_estimations AS e ON 
+                    (e.file_hash = perm.file_hash AND 
+                    e.preprocessor_id = perm.preprocessor_id AND 
+                    e.estimator_id = perm.estimator_id)) as final
+                WHERE final.metric IS NULL"""
         ).fetchall():
             results.append((InputFile(row[0], row[1], row[2]), row[3], row[4]))
         return results
