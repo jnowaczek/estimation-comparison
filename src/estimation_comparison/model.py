@@ -22,7 +22,7 @@ from estimation_comparison.data_collection.compressor.image import ImageCompress
 from estimation_comparison.data_collection.estimator import EstimatorBase
 from estimation_comparison.data_collection.preprocessor import BaseSampler
 
-InputFile = NamedTuple("InputFile", [("hash", str), ("path", str), ("name", str)])
+InputFile = NamedTuple("InputFile", [("hash", str), ("path", str), ("name", str), ("size_bytes", int)])
 
 Ratio = NamedTuple("Ratio", [("hash", str), ("algorithm", str), ("ratio", float)])
 CompressionResult = NamedTuple("CompressionResult", [("hash", str), ("algorithm", str), ("size_bytes", int)])

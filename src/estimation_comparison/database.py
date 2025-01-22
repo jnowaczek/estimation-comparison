@@ -51,7 +51,8 @@ class BenchmarkDatabase:
             """CREATE TABLE IF NOT EXISTS files(
                 file_hash TEXT PRIMARY KEY NOT NULL, 
                 path TEXT NOT NULL, 
-                name TEXT NOT NULL
+                name TEXT NOT NULL,
+                size_bytes INTEGER NOT NULL
             )""")
         self.con.commit()
         self.con.execute(
@@ -120,11 +121,12 @@ class BenchmarkDatabase:
     def update_file(self, file: InputFile):
         try:
             self.con.execute(
-                """INSERT INTO files VALUES(:hash, :path, :name)
+                """INSERT INTO files VALUES(:hash, :path, :name, :size_bytes)
                  ON CONFLICT(file_hash) 
                      DO UPDATE SET 
                         path = :path, 
-                        name = :name""",
+                        name = :name,
+                        size_bytes = :size_bytes""",
                 file
             )
             self.con.commit()
@@ -142,7 +144,7 @@ class BenchmarkDatabase:
             logging.exception(e)
 
     def get_all_files(self):
-        return [InputFile(*row) for row in self.con.execute("SELECT file_hash, path, name FROM files").fetchall()]
+        return [InputFile(*row) for row in self.con.execute("SELECT file_hash, path, name, size_bytes FROM files").fetchall()]
 
     @property
     def input_file_count(self) -> int:
@@ -174,13 +176,14 @@ class BenchmarkDatabase:
         results = []
         for row in self.con.execute(
                 """
-                SELECT combi.file_hash, combi.file_path, combi.file_name, combi.compressor_name
+                SELECT combi.file_hash, combi.file_path, combi.file_name, combi.uncompressed_size_bytes, combi.compressor_name
                 FROM (
                     SELECT DISTINCT 
                         file_hash, 
                         compressor_id, 
                         files.name AS file_name,
                         files.path AS file_path,
+                        files.size_bytes AS uncompressed_size_bytes,
                         compressors.name AS compressor_name
                     FROM files
                     CROSS JOIN compressors
@@ -189,14 +192,14 @@ class BenchmarkDatabase:
                     c.file_hash = combi.file_hash AND c.compressor_id = combi.compressor_id
                 WHERE c.size_bytes IS NULL"""
         ).fetchall():
-            results.append((InputFile(row[0], row[1], row[2]), row[3]))
+            results.append((InputFile(row[0], row[1], row[2], row[3]), row[4]))
         return results
 
     def get_missing_estimation_results(self) -> (InputFile, str, str):
         results = []
         for row in self.con.execute(
                 """
-                SELECT final.file_hash, final.file_path, final.file_name, final.preprocessor_name, final.estimator_name
+                SELECT final.file_hash, final.file_path, final.file_name, final.uncompressed_size_bytes, final.preprocessor_name, final.estimator_name
                 FROM ((
                     SELECT DISTINCT 
                         file_hash, 
@@ -204,6 +207,7 @@ class BenchmarkDatabase:
                         preprocessor_id,
                         files.name AS file_name,
                         files.path AS file_path,
+                        files.size_bytes as uncompressed_size_bytes,
                         preprocessors.name AS preprocessor_name,
                         estimators.name AS estimator_name
                     FROM files
@@ -216,7 +220,7 @@ class BenchmarkDatabase:
                     e.estimator_id = perm.estimator_id)) as final
                 WHERE final.metric IS NULL"""
         ).fetchall():
-            results.append((InputFile(row[0], row[1], row[2]), row[3], row[4]))
+            results.append((InputFile(row[0], row[1], row[2], row[3]), row[4], row[5]))
         return results
 
     def update_estimators(self, estimators: List[Estimator]):
@@ -275,10 +279,11 @@ class BenchmarkDatabase:
     def get_dataframe(self):
         cursor = self.con.cursor()
         cursor.execute("""SELECT (SELECT name FROM files WHERE compression_results.file_hash = files.file_hash) as filename,
+                                 (SELECT size_bytes FROM files WHERE compression_results.file_hash = files.file_hash) as uncompressed_size_bytes,
                                  (SELECT name FROM preprocessors WHERE file_estimations.preprocessor_id = preprocessors.preprocessor_id) as preprocessor,
                                  (SELECT name FROM estimators WHERE file_estimations.estimator_id = estimators.estimator_id) as estimator,
                                  (SELECT name FROM compressors WHERE compression_results.compressor_id = compressors.compressor_id) as compressor,
-                                 compression_results.size_bytes as size_bytes,
+                                 compression_results.size_bytes as compressed_size_bytes,
                                  file_estimations.metric as metric
                           FROM compression_results
                                  LEFT OUTER JOIN file_estimations on compression_results.file_hash = file_estimations.file_hash
@@ -300,11 +305,11 @@ class BenchmarkDatabase:
             logging.debug(f"Entering directory '{path}'")
             for file in filter(lambda f: f.is_file(), path.glob("**/*")):
                 future = client.submit(self._hash_file, file)
-                future.context = (str(file), os.path.relpath(file, path))
+                future.context = (str(file), os.path.relpath(file, path), file.stat().st_size)
                 hash_tasks.append(future)
 
         for future, result in dask.distributed.as_completed(hash_tasks, with_results=True):
-            self.update_file(InputFile(result, future.context[0], future.context[1]))
+            self.update_file(InputFile(result, future.context[0], future.context[1], future.context[2]))
 
     def update_tags(self, tags_csv: Path) -> List[str]:
         try:
