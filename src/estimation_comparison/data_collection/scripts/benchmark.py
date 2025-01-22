@@ -15,9 +15,10 @@
 import argparse
 import functools
 import logging
+import pathlib
 from pathlib import Path
 from timeit import default_timer
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 from dask.distributed import Client, as_completed
@@ -35,8 +36,9 @@ from estimation_comparison.model import Compressor, Estimator, Preprocessor, Inp
 
 
 class Benchmark:
-    def __init__(self, input_dir: List[str], output_dir: str):
+    def __init__(self, input_dir: List[str], output_dir: str, tags_csv: str):
         self._init_time = default_timer()
+        self._tags_csv: Optional[pathlib.Path] = Path(tags_csv)
         self.data_locations = input_dir
         self.output_dir = output_dir
         self.database = BenchmarkDatabase(Path(self.output_dir) / "benchmark.sqlite")
@@ -88,6 +90,9 @@ class Benchmark:
         self.database.update_preprocessors(self._preprocessors)
         logging.info("Updating benchmark database file hash list")
         self.database.update_files(self.client, self.data_locations)
+        if self._tags_csv is not None:
+            logging.info("Updating benchmark database file tags")
+            self.database.update_tags(self._tags_csv)
         logging.info("Updating benchmark database compression results")
         self.database.update_compression_results(self.client, self._compressors)
 
@@ -183,12 +188,13 @@ def main():
     parser.add_argument("dir", action="append")
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true")
     parser.add_argument("-l", "--limit-files", type=int, dest="file_limit", default=0)
-    parser.add_argument("-o", "--output_dir", type=str, dest="output_dir", default="./benchmarks")
+    parser.add_argument("-o", "--output-dir", type=str, dest="output_dir", default="./benchmarks")
+    parser.add_argument("-t", "--tags-csv", type=str, dest="tags_csv", default=None)
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
 
-    benchmark = Benchmark(args.dir, args.output_dir)
+    benchmark = Benchmark(args.dir, args.output_dir, args.tags_csv)
     benchmark.update_database()
 
     benchmark.run()

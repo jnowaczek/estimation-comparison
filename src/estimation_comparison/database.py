@@ -25,6 +25,7 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+import csv
 import hashlib
 import logging
 import os
@@ -60,9 +61,19 @@ class BenchmarkDatabase:
                 parameters BLOB
             )""")
         self.con.commit()
-        # self.cur.execute("CREATE TABLE tag_types(tag_id INT PRIMARY KEY NOT NULL, tag_name TEXT NOT NULL)")
-        # self.cur.execute(
-        #     "CREATE TABLE file_tags(file_hash REFERENCES files(file_hash), tag_id REFERENCES tag_types(tag_id))")
+        self.con.execute(
+            """CREATE TABLE IF NOT EXISTS tag_types(
+                tag_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                tag_name TEXT NOT NULL UNIQUE)
+            """)
+        self.con.commit()
+        self.con.execute(
+            """CREATE TABLE IF NOT EXISTS file_tags(
+                file_hash REFERENCES files(file_hash) NOT NULL, 
+                tag_id REFERENCES tag_types(tag_id) NOT NULL,
+                PRIMARY KEY (file_hash, tag_id)
+                )
+            """)
         self.con.execute(
             """CREATE TABLE IF NOT EXISTS compression_results(
                 file_hash REFERENCES files(file_hash) NOT NULL, 
@@ -242,8 +253,7 @@ class BenchmarkDatabase:
                                                           (SELECT estimator_id FROM estimators WHERE name=?),
                                                           ?)""",
                 (result.input_file.hash, result.preprocessor.name, result.estimator.name,
-                 result.value if isinstance(result.value, (int, float, complex)) and not isinstance(result.value,
-                                                                                                    bool) else None)
+                 result.value[0] if isinstance(result.value, list) and len(result.value) == 1 else result.value)
             )
             self.con.commit()
         except sqlite3.Error as e:
@@ -295,6 +305,30 @@ class BenchmarkDatabase:
 
         for future, result in dask.distributed.as_completed(hash_tasks, with_results=True):
             self.update_file(InputFile(result, future.context[0], future.context[1]))
+
+    def update_tags(self, tags_csv: Path) -> List[str]:
+        try:
+            with open(tags_csv, "r") as f:
+                reader = csv.DictReader(f, restkey="Tags")
+                unique_tags = set()
+                file_tags: List[Tuple[str, str]] = []
+                for row in reader:
+                    tags: List[str] = (row["Keywords"] + (row["Tags"] if "Tags" in row.keys() else "")
+                            ).replace(";", "").split(" ")
+                    unique_tags.update(map(lambda x: (x.lower(),), tags))
+
+                    for tag in tags:
+                        file_tags.append(("RAISE/" + row["File"], tag.lower()))
+
+                self.con.executemany("INSERT OR IGNORE INTO tag_types(tag_name) VALUES(?)", unique_tags)
+                self.con.commit()
+
+                self.con.executemany("INSERT OR IGNORE INTO file_tags VALUES((SELECT file_hash FROM files WHERE ? = files.name), ?)", file_tags)
+                self.con.commit()
+
+        except:
+            logging.exception(f"Error reading {tags_csv}")
+            return []
 
     @staticmethod
     def _compress_file(compressor: Compressor, f: InputFile) -> Tuple[InputFile, Compressor, float]:
