@@ -94,7 +94,7 @@ class BenchmarkDatabase:
                 file_hash REFERENCES files(file_hash) NOT NULL, 
                 preprocessor_id REFERENCES preprocessors(preprocessor_id) NOT NULL,
                 estimator_id REFERENCES estimators(estimator_id) NOT NULL, 
-                metric REAL
+                metric REAL NOT NULL
             )""")
         self.con.commit()
         self.con.execute(
@@ -290,6 +290,19 @@ class BenchmarkDatabase:
                           WHERE metric IS NOT NULL""")
         return cursor.description, cursor.fetchall()
 
+    # cursor.execute("""SELECT (SELECT name FROM files WHERE compression_results.file_hash = files.file_hash) as filename,
+    #                          (SELECT size_bytes FROM files WHERE compression_results.file_hash = files.file_hash) as uncompressed_size_bytes,
+    #                          (SELECT name FROM preprocessors WHERE file_estimations.preprocessor_id = preprocessors.preprocessor_id) as preprocessor,
+    #                          (SELECT name FROM estimators WHERE file_estimations.estimator_id = estimators.estimator_id) as estimator,
+    #                          (SELECT name FROM compressors WHERE compression_results.compressor_id = compressors.compressor_id) as compressor,
+    #                          compression_results.size_bytes as compressed_size_bytes,
+    #                          file_estimations.metric as metric,
+    #                          (SELECT GROUP_CONCAT(tag_name) FROM (SELECT tag_name FROM file_tags JOIN tag_types where file_tags.tag_id=tag_types.tag_id)) as tags
+    #                   FROM compression_results
+    #                          LEFT OUTER JOIN file_estimations ON compression_results.file_hash = file_estimations.file_hash
+    #                          LEFT OUTER JOIN file_tags ON compression_results.file_hash = file_tags.file_hash
+    #                   WHERE metric IS NOT NULL""")
+
     @staticmethod
     def _hash_file(p: Path) -> str:
         with open(p, "rb") as f:
@@ -328,7 +341,14 @@ class BenchmarkDatabase:
                 self.con.executemany("INSERT OR IGNORE INTO tag_types(tag_name) VALUES(?)", unique_tags)
                 self.con.commit()
 
-                self.con.executemany("INSERT OR IGNORE INTO file_tags VALUES((SELECT file_hash FROM files WHERE ? = files.name), ?)", file_tags)
+                self.con.executemany(
+                    """
+                    INSERT OR IGNORE INTO file_tags 
+                      VALUES(
+                        (SELECT file_hash FROM files WHERE ? = files.name),
+                        (SELECT tag_id from tag_types WHERE ? = tag_types.tag_name)
+                      )
+                    """, file_tags)
                 self.con.commit()
 
         except:

@@ -27,4 +27,5 @@ def quadratic_fit(x, y):
 
 def exponential_fit(x, y):
     model = ExponentialModel()
-    return model.fit(y, x=x)
+    params = model.make_params()
+    return model.fit(y, x=x, params=params)
