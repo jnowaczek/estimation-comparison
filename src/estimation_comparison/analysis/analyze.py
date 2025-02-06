@@ -79,7 +79,10 @@ class Analyze:
 
     def run_fit(self):
         combinations = self.data[["preprocessor", "estimator", "compressor"]].drop_duplicates()
-        combinations = combinations.assign(linear_fit=[], linear_conf_lower=[], linear_conf_upper=[])
+        fit_lines = pd.DataFrame(
+            columns=["preprocessor", "estimator", "compressor", "linear_fit", "linear_lower_confidence",
+                     "linear_upper_confidence", "quadratic_fit", "quadratic_lower_confidence",
+                     "quadratic_upper_confidence"])
 
         for row in combinations.itertuples(name="Combination"):
             data_subset = self.data.loc[(self.data.estimator == row.estimator) &
@@ -94,23 +97,14 @@ class Analyze:
 
                 linear = linear_fit(x, y)
                 linear_conf = linear.eval_uncertainty(x=data_subset.percent_size_reduction, sigma=2)
-                row["linear_fit"] = linear.best_fit
-                row["linear_conf_lower"] = data_subset.linear_fit - linear_conf
-                row["linear_conf_upper"] = data_subset.linear_fit + linear_conf
-
-                linear.best_fit
 
                 quadratic = quadratic_fit(x, y)
                 quad_conf = quadratic.eval_uncertainty(x=data_subset.percent_size_reduction, sigma=2)
-                data_subset["quad_fit"] = quadratic.best_fit
-                data_subset["quad_conf_lower"] = data_subset.quad_fit - quad_conf
-                data_subset["quad_conf_upper"] = data_subset.quad_fit + quad_conf
 
-                # exponential = exponential_fit(x, y)
-                # exp_conf = exponential.eval_uncertainty(x=data_subset.percent_size_reduction, sigma=2)
-                # data_subset["exp_fit"] = exponential.best_fit
-                # data_subset["exp_conf_lower"] = data_subset.exp_fit - exp_conf
-                # data_subset["exp_conf_upper"] = data_subset.exp_fit + exp_conf
+                fit_lines[-1] = [row.preprocessor, row.estimator, row.compressor, linear.best_fit,
+                                 linear.best_fit - linear_conf, linear.best_fit + linear_conf,
+                                 quadratic.best_fit,
+                                 quadratic.best_fit - quad_conf, quadratic.best_fit + quad_conf]
 
                 f = figure(y_range=(0, 10), title=f"{e} - {p} - {c}", x_range=(0, 100))
 
