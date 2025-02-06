@@ -14,6 +14,7 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import argparse
 import functools
+import itertools
 import logging
 import pathlib
 from pathlib import Path
@@ -127,57 +128,58 @@ class Benchmark:
         completed_tasks = 0
 
         estimation_tasks = self.database.get_missing_estimation_results()
-        estimation_results = []
 
-        for file, preprocessor_name, estimator_name in estimation_tasks:
-            loaded_file = self.client.submit(self._load_file, file)
+        for batch in itertools.batched(estimation_tasks, 10000):
+            estimation_results = []
+            for file, preprocessor_name, estimator_name in batch:
+                loaded_file = self.client.submit(self._load_file, file)
 
-            preprocessor_instance = next(filter(lambda x: x.name == preprocessor_name, self._preprocessors))
-            preprocessed = self.client.submit(self._preprocess_file, preprocessor=preprocessor_instance,
-                                              data=loaded_file)
+                preprocessor_instance = next(filter(lambda x: x.name == preprocessor_name, self._preprocessors))
+                preprocessed = self.client.submit(self._preprocess_file, preprocessor=preprocessor_instance,
+                                                  data=loaded_file)
 
-            estimator_instance = next(filter(lambda x: x.name == estimator_name, self._estimators))
-            estimation_results.append(
-                self.client.submit(self._run_estimator, estimator=estimator_instance, ir=preprocessed))
+                estimator_instance = next(filter(lambda x: x.name == estimator_name, self._estimators))
+                estimation_results.append(
+                    self.client.submit(self._run_estimator, estimator=estimator_instance, ir=preprocessed))
 
-        # input_files = self.database.get_all_files()
-        # loaded_files = self.client.map(self._load_file, input_files, priority=0)
-        #
-        # preprocessed = []
-        # for p in self._preprocessors:
-        #     for file in loaded_files:
-        #         preprocessed.append(self.client.submit(functools.partial(self._preprocess_file, p), file, priority=0))
-        # # preprocessed = self.client.map(self._preprocess_file, self._preprocessors, loaded_files)
-        # del loaded_files
-        #
-        # results = []
-        # for e in self._estimators:
-        #     for future in preprocessed:
-        #         try:
-        #             if not self.database.get_all_metric():
-        #                 # noinspection PyTypeChecker
-        #                 results.append(
-        #                     self.client.submit(functools.partial(self._run_estimator, e), future, priority=10))
-        #             else:
-        #                 completed_tasks += 1
-        #         except Exception as ex:
-        #             logging.exception(f"Running estimator raised exception\n\t{ex})")
-        # del preprocessed
+            # input_files = self.database.get_all_files()
+            # loaded_files = self.client.map(self._load_file, input_files, priority=0)
+            #
+            # preprocessed = []
+            # for p in self._preprocessors:
+            #     for file in loaded_files:
+            #         preprocessed.append(self.client.submit(functools.partial(self._preprocess_file, p), file, priority=0))
+            # # preprocessed = self.client.map(self._preprocess_file, self._preprocessors, loaded_files)
+            # del loaded_files
+            #
+            # results = []
+            # for e in self._estimators:
+            #     for future in preprocessed:
+            #         try:
+            #             if not self.database.get_all_metric():
+            #                 # noinspection PyTypeChecker
+            #                 results.append(
+            #                     self.client.submit(functools.partial(self._run_estimator, e), future, priority=10))
+            #             else:
+            #                 completed_tasks += 1
+            #         except Exception as ex:
+            #             logging.exception(f"Running estimator raised exception\n\t{ex})")
+            # del preprocessed
 
-        for future, result in as_completed(estimation_results, with_results=True):
-            completed_tasks += 1
-            logging.info(
-                f"{completed_tasks}/{len(estimation_tasks)} estimation tasks complete, {completed_tasks / len(estimation_tasks) * 100:.2f}%")
-            try:
-                self.database.update_result(result)
-                # self.database.update_metric(
-                #     Metric(result.input_file.hash, result.completed_stages[-1],
-                #            pickle.dumps(result.value, pickle.HIGHEST_PROTOCOL)))
-                # self.results[future.context["file"].name] |= {
-                #     f"{future.context["estimator_name"]} Parameters": future.context["estimator_instance"].parameters,
-                #     f"{future.context["estimator_name"]}": future.result()}
-            except Exception as e:
-                logging.exception(f"Input file '{result.input_file.name}' raised exception\n\t{e}")
+            for future, result in as_completed(estimation_results, with_results=True):
+                completed_tasks += 1
+                logging.info(
+                    f"{completed_tasks}/{len(estimation_tasks)} estimation tasks complete, {completed_tasks / len(estimation_tasks) * 100:.2f}%")
+                try:
+                    self.database.update_result(result)
+                    # self.database.update_metric(
+                    #     Metric(result.input_file.hash, result.completed_stages[-1],
+                    #            pickle.dumps(result.value, pickle.HIGHEST_PROTOCOL)))
+                    # self.results[future.context["file"].name] |= {
+                    #     f"{future.context["estimator_name"]} Parameters": future.context["estimator_instance"].parameters,
+                    #     f"{future.context["estimator_name"]}": future.result()}
+                except Exception as e:
+                    logging.exception(f"Input file '{result.input_file.name}' raised exception\n\t{e}")
 
         logging.info(f"Estimation completed in {default_timer() - start_time:.3f} seconds")
         logging.info(f"Benchmark completed in {default_timer() - self._init_time:.3f} seconds")

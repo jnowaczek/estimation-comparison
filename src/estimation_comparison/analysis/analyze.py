@@ -13,7 +13,6 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import argparse
-import itertools
 import logging
 import webbrowser
 from concurrent.futures import ProcessPoolExecutor
@@ -26,7 +25,7 @@ from bokeh.io import save
 from bokeh.models import Band, ColumnDataSource
 from bokeh.plotting import figure, show
 
-from estimation_comparison.analysis.fit import exponential_fit, linear_fit, quadratic_fit
+from estimation_comparison.analysis.fit import linear_fit, quadratic_fit
 from estimation_comparison.analysis.plot import PlotHandler
 from estimation_comparison.database import BenchmarkDatabase
 
@@ -79,66 +78,66 @@ class Analyze:
         hve.show()
 
     def run_fit(self):
+        combinations = self.data[["preprocessor", "estimator", "compressor"]].drop_duplicates()
+        combinations = combinations.assign(linear_fit=[], linear_conf_lower=[], linear_conf_upper=[])
 
-        est = self.data["estimator"].unique().tolist()
-        pre = self.data["preprocessor"].unique().tolist()
-        comp = self.data["compressor"].unique().tolist()
+        for row in combinations.itertuples(name="Combination"):
+            data_subset = self.data.loc[(self.data.estimator == row.estimator) &
+                                        (self.data.preprocessor == row.preprocessor) &
+                                        (self.data.compressor == row.compressor)]
+            data_subset = data_subset.sort_values("percent_size_reduction")
+            print(data_subset.shape)
 
-        for e in est:
-            for (p, c) in itertools.product(pre, comp):
-                subset = self.data.loc[
-                    (self.data["estimator"] == e) & (self.data["preprocessor"] == p) & (self.data["compressor"] == c)]
-                subset = subset.sort_values("percent_size_reduction")
-                print(subset.shape)
+            if not data_subset.empty:
+                x = data_subset.percent_size_reduction.tolist()
+                y = data_subset.metric.tolist()
 
-                if not subset.empty:
-                    x = subset.percent_size_reduction.tolist()
-                    y = subset.metric.tolist()
+                linear = linear_fit(x, y)
+                linear_conf = linear.eval_uncertainty(x=data_subset.percent_size_reduction, sigma=2)
+                row["linear_fit"] = linear.best_fit
+                row["linear_conf_lower"] = data_subset.linear_fit - linear_conf
+                row["linear_conf_upper"] = data_subset.linear_fit + linear_conf
 
-                    linear = linear_fit(x, y)
-                    linear_conf = linear.eval_uncertainty(x=subset.percent_size_reduction, sigma=2)
-                    subset["linear_fit"] = linear.best_fit
-                    subset["linear_conf_lower"] = subset.linear_fit - linear_conf
-                    subset["linear_conf_upper"] = subset.linear_fit + linear_conf
+                linear.best_fit
 
-                    quadratic = quadratic_fit(x, y)
-                    quad_conf = quadratic.eval_uncertainty(x=subset.percent_size_reduction, sigma=2)
-                    subset["quad_fit"] = quadratic.best_fit
-                    subset["quad_conf_lower"] = subset.quad_fit - quad_conf
-                    subset["quad_conf_upper"] = subset.quad_fit + quad_conf
+                quadratic = quadratic_fit(x, y)
+                quad_conf = quadratic.eval_uncertainty(x=data_subset.percent_size_reduction, sigma=2)
+                data_subset["quad_fit"] = quadratic.best_fit
+                data_subset["quad_conf_lower"] = data_subset.quad_fit - quad_conf
+                data_subset["quad_conf_upper"] = data_subset.quad_fit + quad_conf
 
-                    # exponential = exponential_fit(x, y)
-                    # exp_conf = exponential.eval_uncertainty(x=subset.percent_size_reduction, sigma=2)
-                    # subset["exp_fit"] = exponential.best_fit
-                    # subset["exp_conf_lower"] = subset.exp_fit - exp_conf
-                    # subset["exp_conf_upper"] = subset.exp_fit + exp_conf
+                # exponential = exponential_fit(x, y)
+                # exp_conf = exponential.eval_uncertainty(x=data_subset.percent_size_reduction, sigma=2)
+                # data_subset["exp_fit"] = exponential.best_fit
+                # data_subset["exp_conf_lower"] = data_subset.exp_fit - exp_conf
+                # data_subset["exp_conf_upper"] = data_subset.exp_fit + exp_conf
 
-                    f = figure(y_range=(0, 10), title=f"{e} - {p} - {c}", x_range=(0, 100))
+                f = figure(y_range=(0, 10), title=f"{e} - {p} - {c}", x_range=(0, 100))
 
-                    source = ColumnDataSource(subset)
+                source = ColumnDataSource(data_subset)
 
-                    f.scatter(x="percent_size_reduction", y="metric", source=source, alpha=0.5)
+                f.scatter(x="percent_size_reduction", y="metric", source=source, alpha=0.2)
 
-                    f.line(x="percent_size_reduction", y="linear_fit", color="green", legend_label="Linear fit",
-                           source=source)
-                    linear_band = Band(base="percent_size_reduction", lower="linear_conf_lower",
-                                       upper="linear_conf_upper", source=source, fill_color="green", fill_alpha=0.5)
-                    f.add_layout(linear_band)
+                f.line(x="percent_size_reduction", y="linear_fit", color="green", legend_label="Linear fit",
+                       source=source)
+                linear_band = Band(base="percent_size_reduction", lower="linear_conf_lower",
+                                   upper="linear_conf_upper", source=source, fill_color="green", fill_alpha=0.5)
+                f.add_layout(linear_band)
 
-                    f.line(x="percent_size_reduction", y="quad_fit", color="red", legend_label="Quadratic fit",
-                           source=source)
-                    quad_band = Band(base="percent_size_reduction", lower="quad_conf_lower", upper="quad_conf_upper",
-                                     source=source, fill_color="red", fill_alpha=0.5)
-                    f.add_layout(quad_band)
+                f.line(x="percent_size_reduction", y="quad_fit", color="red", legend_label="Quadratic fit",
+                       source=source)
+                quad_band = Band(base="percent_size_reduction", lower="quad_conf_lower", upper="quad_conf_upper",
+                                 source=source, fill_color="red", fill_alpha=0.5)
+                f.add_layout(quad_band)
 
-                    f.line(x="percent_size_reduction", y="exp_fit", color="yellow", legend_label="Exponential fit",
-                           source=source)
-                    exp_band = Band(base="percent_size_reduction", lower="exp_conf_lower", upper="exp_conf_upper",
-                                     source=source, fill_color="yellow", fill_alpha=0.5)
-                    f.add_layout(exp_band)
+                # f.line(x="percent_size_reduction", y="exp_fit", color="yellow", legend_label="Exponential fit",
+                #        source=source)
+                # exp_band = Band(base="percent_size_reduction", lower="exp_conf_lower", upper="exp_conf_upper",
+                #                  source=source, fill_color="yellow", fill_alpha=0.5)
+                # f.add_layout(exp_band)
 
-                    show(f)
-                    input("Press Enter to continue...")
+                show(f)
+                input("Press Enter to continue...")
 
     def run(self):
         plots = {}
