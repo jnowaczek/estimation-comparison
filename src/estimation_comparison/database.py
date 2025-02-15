@@ -33,7 +33,7 @@ import pickle
 import sqlite3
 from pathlib import Path
 from timeit import default_timer
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 import dask.distributed
 
@@ -48,61 +48,84 @@ class BenchmarkDatabase:
 
     def _create_tables(self):
         self.con.execute(
-            """CREATE TABLE IF NOT EXISTS files(
-                file_hash TEXT PRIMARY KEY NOT NULL, 
-                path TEXT NOT NULL, 
-                name TEXT NOT NULL,
-                size_bytes INTEGER NOT NULL
-            )""")
-        self.con.commit()
-        self.con.execute(
-            """CREATE TABLE IF NOT EXISTS compressors(
-                compressor_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
-                name TEXT NOT NULL UNIQUE,
-                parameters BLOB
-            )""")
-        self.con.commit()
-        self.con.execute(
-            """CREATE TABLE IF NOT EXISTS tag_types(
-                tag_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                tag_name TEXT NOT NULL UNIQUE)
+            """
+            CREATE TABLE IF NOT EXISTS files
+            (
+                file_hash  TEXT PRIMARY KEY NOT NULL,
+                path       TEXT             NOT NULL,
+                name       TEXT             NOT NULL,
+                size_bytes INTEGER          NOT NULL
+            )
             """)
         self.con.commit()
         self.con.execute(
-            """CREATE TABLE IF NOT EXISTS file_tags(
-                file_hash REFERENCES files(file_hash) NOT NULL, 
-                tag_id REFERENCES tag_types(tag_id) NOT NULL,
+            """
+            CREATE TABLE IF NOT EXISTS compressors
+            (
+                compressor_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                name          TEXT                              NOT NULL UNIQUE,
+                parameters    BLOB
+            )
+            """)
+        self.con.commit()
+        self.con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tag_types
+            (
+                tag_id   INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                tag_name TEXT                              NOT NULL UNIQUE
+            )
+            """)
+        self.con.commit()
+        self.con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS file_tags
+            (
+                file_hash REFERENCES files (file_hash) NOT NULL,
+                tag_id REFERENCES tag_types (tag_id)   NOT NULL,
                 PRIMARY KEY (file_hash, tag_id)
-                )
+            )
             """)
         self.con.execute(
-            """CREATE TABLE IF NOT EXISTS compression_results(
-                file_hash REFERENCES files(file_hash) NOT NULL, 
-                compressor_id REFERENCES compressors(compressor_id) NOT NULL, 
+            """
+            CREATE TABLE IF NOT EXISTS compression_results
+            (
+                file_hash REFERENCES files (file_hash)               NOT NULL,
+                compressor_id REFERENCES compressors (compressor_id) NOT NULL,
                 size_bytes INTEGER
-            )""")
+            )
+            """)
         self.con.commit()
         self.con.execute(
-            """CREATE TABLE IF NOT EXISTS estimators(
+            """
+            CREATE TABLE IF NOT EXISTS estimators
+            (
                 estimator_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                name TEXT NOT NULL UNIQUE,
-                parameters BLOB
-            )""")
+                name         TEXT                              NOT NULL UNIQUE,
+                parameters   BLOB
+            )
+            """)
         self.con.commit()
         self.con.execute(
-            """CREATE TABLE IF NOT EXISTS file_estimations(
-                file_hash REFERENCES files(file_hash) NOT NULL, 
-                preprocessor_id REFERENCES preprocessors(preprocessor_id) NOT NULL,
-                estimator_id REFERENCES estimators(estimator_id) NOT NULL, 
-                metric REAL NOT NULL
-            )""")
+            """
+            CREATE TABLE IF NOT EXISTS file_estimations
+            (
+                file_hash REFERENCES files (file_hash)                     NOT NULL,
+                preprocessor_id REFERENCES preprocessors (preprocessor_id) NOT NULL,
+                estimator_id REFERENCES estimators (estimator_id)          NOT NULL,
+                metric REAL                                                NOT NULL
+            )
+            """)
         self.con.commit()
         self.con.execute(
-            """CREATE TABLE IF NOT EXISTS preprocessors(
+            """
+            CREATE TABLE IF NOT EXISTS preprocessors
+            (
                 preprocessor_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                name TEXT NOT NULL UNIQUE,
-                parameters BLOB
-            )""")
+                name            TEXT                              NOT NULL UNIQUE,
+                parameters      BLOB
+            )
+            """)
         self.con.commit()
 
     def update_compressors(self, compressors: List[Compressor]):
@@ -121,12 +144,14 @@ class BenchmarkDatabase:
     def update_file(self, file: InputFile):
         try:
             self.con.execute(
-                """INSERT INTO files VALUES(:hash, :path, :name, :size_bytes)
-                 ON CONFLICT(file_hash) 
-                     DO UPDATE SET 
-                        path = :path, 
-                        name = :name,
-                        size_bytes = :size_bytes""",
+                """
+                    INSERT INTO files
+                    VALUES (:hash, :path, :name, :size_bytes)
+                    ON CONFLICT(file_hash)
+                        DO UPDATE SET path       = :path,
+                                      name       = :name,
+                                      size_bytes = :size_bytes
+                    """,
                 file
             )
             self.con.commit()
@@ -144,7 +169,8 @@ class BenchmarkDatabase:
             logging.exception(e)
 
     def get_all_files(self):
-        return [InputFile(*row) for row in self.con.execute("SELECT file_hash, path, name, size_bytes FROM files").fetchall()]
+        return [InputFile(*row) for row in
+                self.con.execute("SELECT file_hash, path, name, size_bytes FROM files").fetchall()]
 
     @property
     def input_file_count(self) -> int:
@@ -153,10 +179,13 @@ class BenchmarkDatabase:
     def get_compression_results_for_file(self, file_hash: str):
         results = []
         for row in self.con.execute(
-                """SELECT file_hash,
-                 (SELECT name FROM compressors WHERE compression_results.compressor_id=compressors.compressor_id),
-                 size_bytes
-                 FROM compression_results WHERE file_hash = ?""",
+                """
+                    SELECT file_hash,
+                           (SELECT name FROM compressors WHERE compression_results.compressor_id = compressors.compressor_id),
+                           size_bytes
+                    FROM compression_results
+                    WHERE file_hash = ?
+                    """,
                 (file_hash,)).fetchall():
             results.append(CompressionResult(*row))
         return results
@@ -164,11 +193,12 @@ class BenchmarkDatabase:
     def get_all_compression_results(self):
         results = []
         for row in self.con.execute(
-                """SELECT 
-                   (SELECT name FROM files where compression_results.file_hash=files.file_hash),
-                   (SELECT name FROM compressors WHERE compression_results.compressor_id=compressors.compressor_id),
-                   size_bytes
-                   FROM compression_results""").fetchall():
+                """
+                SELECT (SELECT name FROM files where compression_results.file_hash = files.file_hash),
+                       (SELECT name FROM compressors WHERE compression_results.compressor_id = compressors.compressor_id),
+                       size_bytes
+                FROM compression_results
+                """).fetchall():
             results.append(FriendlyRatio(*row, ))
         return results
 
@@ -177,21 +207,18 @@ class BenchmarkDatabase:
         for row in self.con.execute(
                 """
                 SELECT combi.file_hash, combi.file_path, combi.file_name, combi.uncompressed_size_bytes, combi.compressor_name
-                FROM (
-                    SELECT DISTINCT 
-                        file_hash, 
-                        compressor_id, 
-                        files.name AS file_name,
-                        files.path AS file_path,
-                        files.size_bytes AS uncompressed_size_bytes,
-                        compressors.name AS compressor_name
-                    FROM files
-                    CROSS JOIN compressors
-                ) combi
-                LEFT JOIN compression_results AS c ON 
+                FROM (SELECT DISTINCT file_hash,
+                                      compressor_id,
+                                      files.name       AS file_name,
+                                      files.path       AS file_path,
+                                      files.size_bytes AS uncompressed_size_bytes,
+                                      compressors.name AS compressor_name
+                      FROM files
+                               CROSS JOIN compressors) combi
+                         LEFT JOIN compression_results AS c ON
                     c.file_hash = combi.file_hash AND c.compressor_id = combi.compressor_id
-                WHERE c.size_bytes IS NULL"""
-        ).fetchall():
+                WHERE c.size_bytes IS NULL
+                """).fetchall():
             results.append((InputFile(row[0], row[1], row[2], row[3]), row[4]))
         return results
 
@@ -199,26 +226,29 @@ class BenchmarkDatabase:
         results = []
         for row in self.con.execute(
                 """
-                SELECT final.file_hash, final.file_path, final.file_name, final.uncompressed_size_bytes, final.preprocessor_name, final.estimator_name
-                FROM ((
-                    SELECT DISTINCT 
-                        file_hash, 
-                        estimator_id,
-                        preprocessor_id,
-                        files.name AS file_name,
-                        files.path AS file_path,
-                        files.size_bytes as uncompressed_size_bytes,
-                        preprocessors.name AS preprocessor_name,
-                        estimators.name AS estimator_name
-                    FROM files
-                    CROSS JOIN estimators
-                    CROSS JOIN preprocessors
-                ) AS perm
-                LEFT JOIN file_estimations AS e ON 
-                    (e.file_hash = perm.file_hash AND 
-                    e.preprocessor_id = perm.preprocessor_id AND 
-                    e.estimator_id = perm.estimator_id)) as final
-                WHERE final.metric IS NULL"""
+                SELECT result.file_hash,
+                       result.file_path,
+                       result.file_name,
+                       result.uncompressed_size_bytes,
+                       result.preprocessor_name,
+                       result.estimator_name
+                FROM ((SELECT DISTINCT file_hash          AS fh,
+                                       estimator_id,
+                                       preprocessor_id,
+                                       files.name         AS file_name,
+                                       files.path         AS file_path,
+                                       files.size_bytes   as uncompressed_size_bytes,
+                                       preprocessors.name AS preprocessor_name,
+                                       estimators.name    AS estimator_name
+                       FROM files
+                                CROSS JOIN estimators
+                                CROSS JOIN preprocessors) permutations
+                    LEFT JOIN file_estimations ON
+                    (file_estimations.file_hash = permutations.fh AND
+                     file_estimations.preprocessor_id = permutations.preprocessor_id AND
+                     file_estimations.estimator_id = permutations.estimator_id)) result
+                WHERE result.metric IS NULL
+                """
         ).fetchall():
             results.append((InputFile(row[0], row[1], row[2], row[3]), row[4], row[5]))
         return results
@@ -252,10 +282,13 @@ class BenchmarkDatabase:
     def update_result(self, result: EstimationResult):
         try:
             self.con.execute(
-                """INSERT INTO file_estimations VALUES(?, 
-                                                          (SELECT preprocessor_id FROM preprocessors WHERE name=?), 
-                                                          (SELECT estimator_id FROM estimators WHERE name=?),
-                                                          ?)""",
+                """
+                INSERT INTO file_estimations
+                VALUES (?,
+                        (SELECT preprocessor_id FROM preprocessors WHERE name = ?),
+                        (SELECT estimator_id FROM estimators WHERE name = ?),
+                        ?)
+                """,
                 (result.input_file.hash, result.preprocessor.name, result.estimator.name,
                  result.value[0] if isinstance(result.value, list) and len(result.value) == 1 else result.value)
             )
@@ -266,42 +299,50 @@ class BenchmarkDatabase:
     def get_all_metric(self):
         metrics = []
         for row in self.con.execute(
-                """SELECT 
-                   (SELECT name FROM files where file_estimations.file_hash=files.file_hash),
-                   (SELECT name FROM preprocessors where file_estimations.preprocessor_id=preprocessors.preprocessor_id),
-                   (SELECT name FROM estimators WHERE file_estimations.estimator_id=estimators.estimator_id),
-                   metric
-                   FROM file_estimations""").fetchall():
+                """
+                SELECT (SELECT name FROM files where file_estimations.file_hash = files.file_hash),
+                       (SELECT name FROM preprocessors where file_estimations.preprocessor_id = preprocessors.preprocessor_id),
+                       (SELECT name FROM estimators WHERE file_estimations.estimator_id = estimators.estimator_id),
+                       metric
+                FROM file_estimations
+                """).fetchall():
             metrics.append(FriendlyMetric(file_name=row[0], preprocessor=row[1], estimator=row[2],
                                           metric=row[3] if not isinstance(row[3], bytes) else pickle.loads(row[3])))
         return metrics
 
     def get_dataframe(self):
         cursor = self.con.cursor()
-        cursor.execute("""SELECT (SELECT name FROM files WHERE compression_results.file_hash = files.file_hash) as filename,
-                                 (SELECT size_bytes FROM files WHERE compression_results.file_hash = files.file_hash) as uncompressed_size_bytes,
-                                 (SELECT name FROM preprocessors WHERE file_estimations.preprocessor_id = preprocessors.preprocessor_id) as preprocessor,
-                                 (SELECT name FROM estimators WHERE file_estimations.estimator_id = estimators.estimator_id) as estimator,
-                                 (SELECT name FROM compressors WHERE compression_results.compressor_id = compressors.compressor_id) as compressor,
-                                 compression_results.size_bytes as compressed_size_bytes,
-                                 file_estimations.metric as metric
-                          FROM compression_results
-                                 LEFT OUTER JOIN file_estimations on compression_results.file_hash = file_estimations.file_hash
-                          WHERE metric IS NOT NULL""")
+        cursor.execute(
+            """
+            SELECT (SELECT name
+                    FROM files
+                    WHERE compression_results.file_hash = files.file_hash)                  as filename,
+                   (SELECT size_bytes
+                    FROM files
+                    WHERE compression_results.file_hash = files.file_hash)                  as uncompressed_size_bytes,
+                   (SELECT name
+                    FROM preprocessors
+                    WHERE file_estimations.preprocessor_id = preprocessors.preprocessor_id) as preprocessor,
+                   (SELECT name
+                    FROM estimators
+                    WHERE file_estimations.estimator_id = estimators.estimator_id)          as estimator,
+                   (SELECT name
+                    FROM compressors
+                    WHERE compression_results.compressor_id = compressors.compressor_id)    as compressor,
+                   compression_results.size_bytes                                           as compressed_size_bytes,
+                   file_estimations.metric                                                  as metric,
+                   tags_list.tag_names
+            FROM compression_results
+                     JOIN (SELECT file_hash,
+                                  GROUP_CONCAT((SELECT tag_name
+                                                from tag_types
+                                                WHERE file_tags.tag_id = tag_types.tag_id)) AS tag_names
+                           FROM file_tags
+                           GROUP BY file_tags.file_hash) tags_list
+                     LEFT OUTER JOIN file_estimations ON compression_results.file_hash = file_estimations.file_hash
+            WHERE metric IS NOT NULL
+            """)
         return cursor.description, cursor.fetchall()
-
-    # cursor.execute("""SELECT (SELECT name FROM files WHERE compression_results.file_hash = files.file_hash) as filename,
-    #                          (SELECT size_bytes FROM files WHERE compression_results.file_hash = files.file_hash) as uncompressed_size_bytes,
-    #                          (SELECT name FROM preprocessors WHERE file_estimations.preprocessor_id = preprocessors.preprocessor_id) as preprocessor,
-    #                          (SELECT name FROM estimators WHERE file_estimations.estimator_id = estimators.estimator_id) as estimator,
-    #                          (SELECT name FROM compressors WHERE compression_results.compressor_id = compressors.compressor_id) as compressor,
-    #                          compression_results.size_bytes as compressed_size_bytes,
-    #                          file_estimations.metric as metric,
-    #                          (SELECT GROUP_CONCAT(tag_name) FROM (SELECT tag_name FROM file_tags JOIN tag_types where file_tags.tag_id=tag_types.tag_id)) as tags
-    #                   FROM compression_results
-    #                          LEFT OUTER JOIN file_estimations ON compression_results.file_hash = file_estimations.file_hash
-    #                          LEFT OUTER JOIN file_tags ON compression_results.file_hash = file_tags.file_hash
-    #                   WHERE metric IS NOT NULL""")
 
     @staticmethod
     def _hash_file(p: Path) -> str:
@@ -324,7 +365,7 @@ class BenchmarkDatabase:
         for future, result in dask.distributed.as_completed(hash_tasks, with_results=True):
             self.update_file(InputFile(result, future.context[0], future.context[1], future.context[2]))
 
-    def update_tags(self, tags_csv: Path) -> List[str]:
+    def update_tags(self, tags_csv: Path):
         try:
             with open(tags_csv, "r") as f:
                 reader = csv.DictReader(f, restkey="Tags")
@@ -332,7 +373,7 @@ class BenchmarkDatabase:
                 file_tags: List[Tuple[str, str]] = []
                 for row in reader:
                     tags: List[str] = (row["Keywords"] + (row["Tags"] if "Tags" in row.keys() else "")
-                            ).replace(";", "").split(" ")
+                                       ).replace(";", "").split(" ")
                     unique_tags.update(map(lambda x: (x.lower(),), tags))
 
                     for tag in tags:
@@ -343,20 +384,16 @@ class BenchmarkDatabase:
 
                 self.con.executemany(
                     """
-                    INSERT OR IGNORE INTO file_tags 
-                      VALUES(
-                        (SELECT file_hash FROM files WHERE ? = files.name),
-                        (SELECT tag_id from tag_types WHERE ? = tag_types.tag_name)
-                      )
+                    INSERT OR IGNORE INTO file_tags
+                    VALUES ((SELECT file_hash FROM files WHERE ? = files.name),
+                            (SELECT tag_id from tag_types WHERE ? = tag_types.tag_name))
                     """, file_tags)
                 self.con.commit()
-
         except:
             logging.exception(f"Error reading {tags_csv}")
-            return []
 
     @staticmethod
-    def _compress_file(compressor: Compressor, f: InputFile) -> Tuple[InputFile, Compressor, float]:
+    def _compress_file(compressor: Compressor, f: InputFile) -> Optional[Tuple[InputFile, Compressor, float]]:
         try:
             with open(f.path, "rb") as fd:
                 return f, compressor, compressor.instance.run(fd.read())
