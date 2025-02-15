@@ -1,4 +1,17 @@
-#  Copyright (C) 2024 Julian Nowaczek.
+#  Copyright (C) 2025 Julian Nowaczek.
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -89,7 +102,6 @@ class Analyze:
                                         (self.data.preprocessor == row.preprocessor) &
                                         (self.data.compressor == row.compressor)]
             data_subset = data_subset.sort_values("percent_size_reduction")
-            print(data_subset.shape)
 
             if not data_subset.empty:
                 x = data_subset.percent_size_reduction.tolist()
@@ -106,7 +118,7 @@ class Analyze:
                                  quadratic.best_fit,
                                  quadratic.best_fit - quad_conf, quadratic.best_fit + quad_conf]
 
-                f = figure(y_range=(0, 10), title=f"{e} - {p} - {c}", x_range=(0, 100))
+                f = figure(y_range=(0, 10), title=f"{row.estimator} - {row.preprocessor} - {row.compressor}", x_range=(0, 100))
 
                 source = ColumnDataSource(data_subset)
 
