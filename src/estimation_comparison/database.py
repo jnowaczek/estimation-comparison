@@ -126,7 +126,8 @@ class BenchmarkDatabase:
                 file_hash REFERENCES files (file_hash)                     NOT NULL,
                 preprocessor_id REFERENCES preprocessors (preprocessor_id) NOT NULL,
                 estimator_id REFERENCES estimators (estimator_id)          NOT NULL,
-                metric REAL                                                NOT NULL
+                metric REAL                                                NOT NULL,
+                UNIQUE (file_hash, preprocessor_id, estimator_id) ON CONFLICT REPLACE
             )
             """)
         self.con.commit()
@@ -323,38 +324,80 @@ class BenchmarkDatabase:
                                           metric=row[3] if not isinstance(row[3], bytes) else pickle.loads(row[3])))
         return metrics
 
-    def get_dataframe(self):
-        cursor = self.con.cursor()
-        cursor.execute(
+    def get_preprocessors(self) -> [(int, str)]:
+        return self.con.execute(
             """
-            SELECT (SELECT name
-                    FROM files
-                    WHERE compression_results.file_hash = files.file_hash)                  as filename,
-                   (SELECT size_bytes
-                    FROM files
-                    WHERE compression_results.file_hash = files.file_hash)                  as uncompressed_size_bytes,
-                   (SELECT name
-                    FROM preprocessors
-                    WHERE file_estimations.preprocessor_id = preprocessors.preprocessor_id) as preprocessor,
-                   (SELECT name
-                    FROM estimators
-                    WHERE file_estimations.estimator_id = estimators.estimator_id)          as estimator,
-                   (SELECT name
-                    FROM compressors
-                    WHERE compression_results.compressor_id = compressors.compressor_id)    as compressor,
-                   compression_results.size_bytes                                           as compressed_size_bytes,
-                   file_estimations.metric                                                  as metric,
-                   tags_list.tag_names
+            SELECT preprocessor_id, name
+            FROM preprocessors
+            """).fetchall()
+
+    def get_estimators(self) -> [(int, str)]:
+        return self.con.execute(
+            """
+            SELECT estimator_id, name
+            FROM estimators
+            """).fetchall()
+
+    def get_compressors(self) -> [(int, str)]:
+        return self.con.execute(
+            """
+            SELECT compressor_id, name
+            FROM compressors
+            """).fetchall()
+
+    def get_tags(self) -> [(int, str)]:
+        return self.con.execute("SELECT tag_id, tag_name FROM tag_types")
+
+    def get_combinations(self) -> [(str, str, str)]:
+        return self.con.execute(
+            """
+            SELECT p.name, e.name, c.name
+            FROM preprocessors p
+                     CROSS JOIN estimators e
+                     CROSS JOIN compressors c
+            """).fetchall()
+
+    def get_all_estimations_dataframe(self):
+        cursor = self.con.execute(
+            """
+            SELECT compression_results.file_hash,
+                   preprocessor_id,
+                   estimator_id,
+                   compressor_id,
+                   metric,
+                   files.size_bytes AS initial_size,
+                   compression_results.size_bytes AS final_size
             FROM compression_results
-                     JOIN (SELECT file_hash,
-                                  GROUP_CONCAT((SELECT tag_name
-                                                from tag_types
-                                                WHERE file_tags.tag_id = tag_types.tag_id)) AS tag_names
-                           FROM file_tags
-                           GROUP BY file_tags.file_hash) tags_list
-                     LEFT OUTER JOIN file_estimations ON compression_results.file_hash = file_estimations.file_hash
+                     INNER JOIN file_estimations ON compression_results.file_hash = file_estimations.file_hash
+                     INNER JOIN files ON compression_results.file_hash = files.file_hash
             WHERE metric IS NOT NULL
             """)
+        return cursor.description, cursor.fetchall()
+
+    def get_solo_tag_plot_dataframe(self, preprocessor: str, estimator: str, compressor: str, tag: str):
+        cursor = self.con.execute(
+            """
+            WITH files_with_tag AS (SELECT file_hash
+                                    FROM file_tags ft
+                                             JOIN tag_types tt ON ft.tag_id = tt.tag_id
+                                    GROUP BY file_hash
+                                    HAVING SUM(CASE WHEN tag_name = ? THEN 1 ELSE 0 END) > 0),
+                 filtered_files AS (SELECT f.*
+                                    FROM files f
+                                             INNER JOIN files_with_tag fwt ON fwt.file_hash = f.file_hash)
+            SELECT fe.file_hash,
+                   fe.metric,
+                   ff.size_bytes as initial_size,
+                   cr.size_bytes as final_size
+            FROM file_estimations fe
+                     INNER JOIN filtered_files ff ON ff.file_hash = fe.file_hash
+                     INNER JOIN compression_results cr ON cr.file_hash = fe.file_hash
+            WHERE metric IS NOT NULL
+              AND fe.preprocessor_id = (SELECT preprocessor_id FROM preprocessors WHERE name = ?)
+              AND fe.estimator_id = (SELECT estimator_id FROM estimators WHERE name = ?)
+              AND cr.compressor_id = (SELECT compressor_id FROM compressors WHERE name = ?)
+            ORDER BY name
+            """, (tag, preprocessor, estimator, compressor))
         return cursor.description, cursor.fetchall()
 
     @staticmethod

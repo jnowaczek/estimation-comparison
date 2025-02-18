@@ -87,6 +87,8 @@ class EstimationResult:
     estimator: Estimator
 
     @classmethod
-    def from_intermediate_result(cls, ir: IntermediateEstimationResult, value: int | float, estimator: Estimator) -> Self:
-        return EstimationResult(value=value, completed_stages=ir.completed_stages + [estimator.name], input_file=ir.input_file,
+    def from_intermediate_result(cls, ir: IntermediateEstimationResult, value: int | float,
+                                 estimator: Estimator) -> Self:
+        return EstimationResult(value=value, completed_stages=ir.completed_stages + [estimator.name],
+                                input_file=ir.input_file,
                                 preprocessor=ir.preprocessor, estimator=estimator)

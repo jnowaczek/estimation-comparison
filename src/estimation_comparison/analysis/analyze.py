@@ -61,7 +61,7 @@ class Analyze:
         #                                           columns=["filename", "compressor", "ratio"])
         # self.metrics = pd.DataFrame().from_records(self.database.get_all_metric(),
         #                                            columns=["filename", "estimator", "metric"])
-        description, records = self.database.get_dataframe()
+        description, records = self.database.get_all_estimations_dataframe()
 
         self.data = pd.DataFrame().from_records(records, columns=[item[0] for item in description])
         self.data["percent_size_reduction"] = (1.0 - (
@@ -78,7 +78,7 @@ class Analyze:
             case _:
                 raise ValueError(f"Unsupported file type: {suffix}")
         logging.info(f"Loaded '{filename}'")
-        self._create_dataframes()
+        # self._create_dataframes()
         self.plot_handler = PlotHandler(self.data)
 
     def run_explore(self):
@@ -118,7 +118,8 @@ class Analyze:
                                  quadratic.best_fit,
                                  quadratic.best_fit - quad_conf, quadratic.best_fit + quad_conf]
 
-                f = figure(y_range=(0, 10), title=f"{row.estimator} - {row.preprocessor} - {row.compressor}", x_range=(0, 100))
+                f = figure(y_range=(0, 10), title=f"{row.estimator} - {row.preprocessor} - {row.compressor}",
+                           x_range=(0, 100))
 
                 source = ColumnDataSource(data_subset)
 
@@ -144,6 +145,12 @@ class Analyze:
 
                 show(f)
                 input("Press Enter to continue...")
+
+    def run_tag_plots(self):
+        for combination in self.database.get_combinations():
+            description, records = self.database.get_solo_tag_plot_dataframe(*combination, tag="outdoor")
+            data = pd.DataFrame().from_records(records, columns=[item[0] for item in description])
+            print(data.head())
 
     def run(self):
         plots = {}
@@ -215,4 +222,4 @@ if __name__ == "__main__":
     else:
         analyze.load(args.input_dir / "benchmark.sqlite")
 
-    analyze.run_fit()
+    analyze.run_tag_plots()
