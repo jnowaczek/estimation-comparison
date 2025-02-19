@@ -43,7 +43,7 @@ from estimation_comparison.data_collection.compressor.image import *
 from estimation_comparison.data_collection.estimator import *
 from estimation_comparison.data_collection.preprocessor import NoopSampler, PatchSampler
 from estimation_comparison.data_collection.preprocessor.linear_sample import LinearSampler
-from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch
+from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch, autocorrelation_lag
 from estimation_comparison.database import BenchmarkDatabase
 from estimation_comparison.model import Compressor, Estimator, Preprocessor, InputFile, IntermediateEstimationResult, \
     EstimationResult, LoadedData
@@ -78,6 +78,14 @@ class Benchmark:
             ),
             Estimator(name="bytecount_file", instance=ByteCount()),
             Estimator(name="entropy_bits", instance=Entropy()),
+            Estimator(
+                name="autocorrelation_972_lag_1_mean",
+                instance=Autocorrelation(
+                    block_size=972,
+                    block_summary_fn=functools.partial(autocorrelation_lag, lag=1),
+                    file_summary_fn=np.mean
+                )
+            ),
         ]
 
         self._compressors: List[Compressor] = [
@@ -111,7 +119,7 @@ class Benchmark:
         self.database.update_compression_results(self.client, self._compressors)
 
     @staticmethod
-    def _load_file(file: InputFile) -> LoadedData:
+    def _load_file(file: InputFile) -> LoadedData | None:
         try:
             with open(file.path, "rb") as f:
                 data = f.read()
@@ -130,7 +138,7 @@ class Benchmark:
                                             input_file=data.input_file, preprocessor=preprocessor)
 
     @staticmethod
-    def _run_estimator(estimator: Estimator, ir: IntermediateEstimationResult) -> EstimationResult:
+    def _run_estimator(estimator: Estimator, ir: IntermediateEstimationResult) -> EstimationResult | None:
         try:
             return EstimationResult.from_intermediate_result(ir, estimator.instance.run(ir.data), estimator)
         except Exception as e:

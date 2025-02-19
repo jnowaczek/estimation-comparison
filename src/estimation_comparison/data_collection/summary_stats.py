@@ -46,3 +46,9 @@ def max_below_cutoff(x, cutoff: int):
         return np.max(x[:cutoff])
     except ValueError:
         return 0.0
+
+def autocorrelation_lag(x, lag: int) -> float:
+    try:
+        return x[len(x) // 2 + lag]
+    except ValueError:
+        return 0.0
