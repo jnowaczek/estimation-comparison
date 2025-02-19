@@ -240,7 +240,7 @@ class BenchmarkDatabase:
         results = []
         for row in self.con.execute(
                 """
-                SELECT result.file_hash,
+                SELECT result.fh,
                        result.file_path,
                        result.file_name,
                        result.uncompressed_size_bytes,
