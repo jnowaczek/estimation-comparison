@@ -38,6 +38,7 @@ lin_fit_show = pn.widgets.Checkbox(name="Show linear fit", value=False)
 quad_fit_show = pn.widgets.Checkbox(name="Show quadratic fit", value=False)
 
 template = pn.template.BootstrapTemplate(
+    title="RAISE Tags Explorer",
     sidebar=[pre_select, est_select, comp_select, tag_select, lin_fit_show, quad_fit_show])
 
 
@@ -92,6 +93,10 @@ def plot(preprocessor: str, estimator: str, compressor: str, tags: [str],
             fig.add_layout(quad_band)
 
     return pn.pane.Bokeh(fig)
+
+home_button = pn.widgets.Button(name="Index", button_type="primary")
+home_button.js_on_click(code="window.location.href='/'")
+template.header.append(home_button)
 
 
 bokeh_pane = pn.bind(plot, pre_select, est_select, comp_select, tag_select, lin_fit_show, quad_fit_show)

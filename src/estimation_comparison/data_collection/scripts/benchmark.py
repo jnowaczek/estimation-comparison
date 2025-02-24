@@ -43,7 +43,8 @@ from estimation_comparison.data_collection.compressor.image import *
 from estimation_comparison.data_collection.estimator import *
 from estimation_comparison.data_collection.preprocessor import NoopSampler, PatchSampler
 from estimation_comparison.data_collection.preprocessor.linear_sample import LinearSampler
-from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch, autocorrelation_lag
+from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch, autocorrelation_lag, \
+    proportion_above_metric_cutoff
 from estimation_comparison.database import BenchmarkDatabase
 from estimation_comparison.model import Compressor, Estimator, Preprocessor, InputFile, IntermediateEstimationResult, \
     EstimationResult, LoadedData
@@ -83,6 +84,22 @@ class Benchmark:
                 instance=Autocorrelation(
                     block_size=972,
                     block_summary_fn=functools.partial(autocorrelation_lag, lag=1),
+                    file_summary_fn=np.mean
+                )
+            ),
+            Estimator(
+                name="autocorrelation_972_lag_3_mean",
+                instance=Autocorrelation(
+                    block_size=972,
+                    block_summary_fn=functools.partial(autocorrelation_lag, lag=3),
+                    file_summary_fn=np.mean
+                )
+            ),
+            Estimator(
+                name="autocorrelation_972_fraction_above_0.25_mean",
+                instance=Autocorrelation(
+                    block_size=972,
+                    block_summary_fn=functools.partial(proportion_above_metric_cutoff, cutoff=0.25),
                     file_summary_fn=np.mean
                 )
             ),
