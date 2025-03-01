@@ -14,6 +14,7 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from pathlib import Path
 
+import colorcet as cc
 import pandas as pd
 import panel as pn
 import param
@@ -84,14 +85,14 @@ class PlotEditor(pn.viewable.Viewer):
         fig = figure(x_range=(0, 100))
         fig.sizing_mode = "scale_both"
 
-        for s in series:
+        for index, s in enumerate(series):
             desc, rec = db.get_solo_tag_plot_dataframe(s.preprocessor, s.estimator, s.compressor, "outdoor")
 
             data = pd.DataFrame.from_records(rec, columns=[item[0] for item in desc])
 
             data["percent_size_reduction"] = (1.0 - (data["final_size"] / data["initial_size"])) * 100.0
             data.sort_values("percent_size_reduction", inplace=True)
-            fig.scatter(x="percent_size_reduction", y="metric", source=data, alpha=0.2)
+            fig.scatter(x="percent_size_reduction", y="metric", color=cc.b_glasbey_hv[index], source=data, alpha=0.2)
 
             if s.lin_fit_show:
                 linear = linear_fit(data["percent_size_reduction"], data["metric"])
@@ -111,16 +112,16 @@ class PlotEditor(pn.viewable.Viewer):
 
             if s.lin_fit_show:
                 fig.line(x="percent_size_reduction", y="lin_fit",
-                         legend_label=f"{"outdoor"} Linear fit", source=source)
+                         legend_label=f"{"outdoor"} Linear fit", source=source, color=cc.b_glasbey_hv[index])
                 lin_band = Band(base="percent_size_reduction", lower="lin_conf_lower", upper="lin_conf_upper",
-                                source=source, fill_alpha=0.5)
+                                source=source, fill_color=cc.b_glasbey_hv[index], fill_alpha=0.5)
                 fig.add_layout(lin_band)
 
             if s.quad_fit_show:
                 fig.line(x="percent_size_reduction", y="quad_fit",
-                         legend_label=f"{"outdoor"} Quadratic fit", source=source)
+                         legend_label=f"{"outdoor"} Quadratic fit", source=source, color=cc.b_glasbey_hv[index])
                 quad_band = Band(base="percent_size_reduction", lower="quad_conf_lower", upper="quad_conf_upper",
-                                 source=source, fill_alpha=0.5)
+                                 source=source, fill_color=cc.b_glasbey_hv[index], fill_alpha=0.5)
                 fig.add_layout(quad_band)
 
         return fig
