@@ -45,6 +45,12 @@ class SeriesPlots(pn.viewable.Viewer):
     def add_series(self, series):
         self.value = [*self.value, series]
 
+    def clear_series(self, *_):
+        self.value = []
+
+    def pop_series(self, *_):
+        self.value = self.value[:-1]
+
 
 class SeriesInput(pn.viewable.Viewer):
     value: Series = param.ClassSelector(class_=Series)
@@ -86,13 +92,15 @@ class PlotEditor(pn.viewable.Viewer):
         fig.sizing_mode = "scale_both"
 
         for index, s in enumerate(series):
-            desc, rec = db.get_solo_tag_plot_dataframe(s.preprocessor, s.estimator, s.compressor, "outdoor")
+            desc, rec = db.get_solo_plot_dataframe(s.preprocessor, s.estimator, s.compressor)
 
             data = pd.DataFrame.from_records(rec, columns=[item[0] for item in desc])
 
             data["percent_size_reduction"] = (1.0 - (data["final_size"] / data["initial_size"])) * 100.0
             data.sort_values("percent_size_reduction", inplace=True)
-            fig.scatter(x="percent_size_reduction", y="metric", color=cc.b_glasbey_hv[index], source=data, alpha=0.2)
+            fig.scatter(x="percent_size_reduction", y="metric",
+                        legend_label=f"{s.estimator} ({s.preprocessor}), {s.compressor}",
+                        color=cc.b_glasbey_hv[index], source=data, alpha=0.2)
 
             if s.lin_fit_show:
                 linear = linear_fit(data["percent_size_reduction"], data["metric"])
@@ -111,15 +119,13 @@ class PlotEditor(pn.viewable.Viewer):
             source = ColumnDataSource(data)
 
             if s.lin_fit_show:
-                fig.line(x="percent_size_reduction", y="lin_fit",
-                         legend_label=f"{"outdoor"} Linear fit", source=source, color=cc.b_glasbey_hv[index])
+                fig.line(x="percent_size_reduction", y="lin_fit", source=source, color=cc.b_glasbey_hv[index])
                 lin_band = Band(base="percent_size_reduction", lower="lin_conf_lower", upper="lin_conf_upper",
                                 source=source, fill_color=cc.b_glasbey_hv[index], fill_alpha=0.5)
                 fig.add_layout(lin_band)
 
             if s.quad_fit_show:
-                fig.line(x="percent_size_reduction", y="quad_fit",
-                         legend_label=f"{"outdoor"} Quadratic fit", source=source, color=cc.b_glasbey_hv[index])
+                fig.line(x="percent_size_reduction", y="quad_fit", source=source, color=cc.b_glasbey_hv[index])
                 quad_band = Band(base="percent_size_reduction", lower="quad_conf_lower", upper="quad_conf_upper",
                                  source=source, fill_color=cc.b_glasbey_hv[index], fill_alpha=0.5)
                 fig.add_layout(quad_band)
@@ -128,8 +134,19 @@ class PlotEditor(pn.viewable.Viewer):
 
     def __panel__(self):
         series_input = SeriesInput()
+
+        remove_all_button = pn.widgets.Button(name="Remove All", button_type="primary")
+        remove_last_button = pn.widgets.Button(name="Remove Last", button_type="primary")
+
         pn.bind(self.value.add_series, series_input.param.value, watch=True)
-        return pn.Row(series_input, self._layout)
+        pn.bind(self.value.pop_series, remove_last_button, watch=True)
+        pn.bind(self.value.clear_series, remove_all_button, watch=True)
+
+        button_row = pn.Row(remove_last_button, remove_all_button, align="center")
+
+        controls = pn.Column(series_input, button_row)
+
+        return pn.Row(controls, self._layout)
 
 
 series_list = SeriesPlots(value=[])

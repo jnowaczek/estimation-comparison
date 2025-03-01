@@ -400,6 +400,24 @@ class BenchmarkDatabase:
             """, (tag, preprocessor, estimator, compressor))
         return cursor.description, cursor.fetchall()
 
+    def get_solo_plot_dataframe(self, preprocessor: str, estimator: str, compressor: str):
+        cursor = self.con.execute(
+            """
+            SELECT fe.file_hash,
+                   fe.metric,
+                   f.size_bytes as initial_size,
+                   cr.size_bytes as final_size
+            FROM file_estimations fe
+                     INNER JOIN files f ON f.file_hash = fe.file_hash
+                     INNER JOIN compression_results cr ON cr.file_hash = fe.file_hash
+            WHERE metric IS NOT NULL
+              AND fe.preprocessor_id = (SELECT preprocessor_id FROM preprocessors WHERE name = ?)
+              AND fe.estimator_id = (SELECT estimator_id FROM estimators WHERE name = ?)
+              AND cr.compressor_id = (SELECT compressor_id FROM compressors WHERE name = ?)
+            ORDER BY name
+            """, (preprocessor, estimator, compressor))
+        return cursor.description, cursor.fetchall()
+
     @staticmethod
     def _hash_file(p: Path) -> str:
         with open(p, "rb") as f:
