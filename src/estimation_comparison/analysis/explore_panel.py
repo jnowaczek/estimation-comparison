@@ -156,7 +156,7 @@ template = pn.template.BootstrapTemplate(title="RAISE Explorer")
 template.main.append(plot_editor)
 
 home_button = pn.widgets.Button(name="Index", button_type="primary")
-home_button.js_on_click(code="window.location.href='/'")
+home_button.js_on_click(code="window.location.href='/panel/'")
 template.header.append(home_button)
 
 # bokeh_pane = pn.bind(plot, series_list.param.ls)

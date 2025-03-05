@@ -95,7 +95,7 @@ def plot(preprocessor: str, estimator: str, compressor: str, tags: [str],
     return pn.pane.Bokeh(fig)
 
 home_button = pn.widgets.Button(name="Index", button_type="primary")
-home_button.js_on_click(code="window.location.href='/'")
+home_button.js_on_click(code="window.location.href='/panel/'")
 template.header.append(home_button)
 
 
