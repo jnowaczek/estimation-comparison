@@ -141,6 +141,54 @@ class BenchmarkDatabase:
             )
             """)
         self.con.commit()
+        self.con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS block_summary_stats
+            (
+                block_summary_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                name             TEXT                              NOT NULL UNIQUE,
+                parameters       BLOB
+            )
+            """
+        )
+        self.con.commit()
+        self.con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS file_summary_stats
+            (
+                file_summary_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                name            TEXT                              NOT NULL UNIQUE,
+                parameters      BLOB
+            )
+            """
+        )
+        self.con.commit()
+
+    def update_estimators(self, estimators: List[Estimator]):
+        try:
+            estimator_list = []
+            for e in estimators:
+                estimator_list.append(
+                    {"name": e.name, "parameters": pickle.dumps(e.instance.traits(), protocol=pickle.HIGHEST_PROTOCOL)})
+
+            self.con.executemany("INSERT OR IGNORE INTO estimators(name, parameters) VALUES(:name, :parameters)",
+                                 estimator_list)
+            self.con.commit()
+        except sqlite3.Error as e:
+            logging.exception(e)
+
+    def update_preprocessors(self, preprocessors: List[Preprocessor]):
+        try:
+            preprocessor_list = []
+            for p in preprocessors:
+                preprocessor_list.append(
+                    {"name": p.name, "parameters": pickle.dumps(p.instance.traits(), protocol=pickle.HIGHEST_PROTOCOL)})
+
+            self.con.executemany("INSERT OR IGNORE INTO preprocessors(name, parameters) VALUES(:name, :parameters)",
+                                 preprocessor_list)
+            self.con.commit()
+        except sqlite3.Error as e:
+            logging.exception(e)
 
     def update_compressors(self, compressors: List[Compressor]):
         try:
@@ -172,6 +220,48 @@ class BenchmarkDatabase:
         except sqlite3.Error as e:
             logging.exception(e)
 
+    def update_files(self, client: dask.distributed.Client, locations):
+        hash_tasks = []
+
+        # Glob 'em, hash 'em, and INSERT 'em
+        for s in locations:
+            path = Path(s)
+            logging.debug(f"Entering directory '{path}'")
+            for file in filter(lambda f: f.is_file(), path.glob("**/*")):
+                future = client.submit(self._hash_file, file)
+                future.context = (str(file), os.path.relpath(file, path), file.stat().st_size)
+                hash_tasks.append(future)
+
+        for future, result in dask.distributed.as_completed(hash_tasks, with_results=True):
+            self.update_file(InputFile(result, future.context[0], future.context[1], future.context[2]))
+
+    def update_tags(self, tags_csv: Path):
+        try:
+            with open(tags_csv, "r") as f:
+                reader = csv.DictReader(f, restkey="Tags")
+                unique_tags = set()
+                file_tags: List[Tuple[str, str]] = []
+                for row in reader:
+                    tags: List[str] = (row["Keywords"] + (row["Tags"] if "Tags" in row.keys() else "")
+                                       ).replace(";", "").split(" ")
+                    unique_tags.update(map(lambda x: (x.lower(),), tags))
+
+                    for tag in tags:
+                        file_tags.append(("RAISE/" + row["File"], tag.lower()))
+
+                self.con.executemany("INSERT OR IGNORE INTO tag_types(tag_name) VALUES(?)", unique_tags)
+                self.con.commit()
+
+                self.con.executemany(
+                    """
+                    INSERT OR IGNORE INTO file_tags
+                    VALUES ((SELECT file_hash FROM files WHERE ? = files.name),
+                            (SELECT tag_id from tag_types WHERE ? = tag_types.tag_name))
+                    """, file_tags)
+                self.con.commit()
+        except:
+            logging.exception(f"Error reading {tags_csv}")
+
     def update_compression_result(self, new_result: CompressionResult):
         try:
             self.con.execute(
@@ -181,6 +271,28 @@ class BenchmarkDatabase:
             self.con.commit()
         except sqlite3.Error as e:
             logging.exception(e)
+
+    def update_compression_results(self, client: dask.distributed.Client, compressors: List[Compressor]):
+        ratio_start_time = default_timer()
+        compression_tasks = []
+        submitted_compression_tasks = 0
+        completed_compression_tasks = 0
+
+        for job in self.get_missing_compression_results():
+            future = client.submit(self._compress_file,
+                                   next(filter(lambda x: x.name == job[1], compressors)), job[0])
+            compression_tasks.append(future)
+            submitted_compression_tasks += 1
+
+        for future, result in dask.distributed.as_completed(compression_tasks, with_results=True):
+            self.update_compression_result(
+                CompressionResult(result[0].hash, result[1].name, result[2]))
+            completed_compression_tasks += 1
+            logging.info(
+                f"{completed_compression_tasks}/{submitted_compression_tasks} tasks complete, {completed_compression_tasks / submitted_compression_tasks * 100:.2f}%")
+
+        logging.info(
+            f"Calculated {completed_compression_tasks} new compression ratios in {default_timer() - ratio_start_time:.3f} seconds")
 
     def get_all_files(self):
         return [InputFile(*row) for row in
@@ -266,32 +378,6 @@ class BenchmarkDatabase:
         ).fetchall():
             results.append((InputFile(row[0], row[1], row[2], row[3]), row[4], row[5]))
         return results
-
-    def update_estimators(self, estimators: List[Estimator]):
-        try:
-            estimator_list = []
-            for e in estimators:
-                estimator_list.append(
-                    {"name": e.name, "parameters": pickle.dumps(e.instance.traits(), protocol=pickle.HIGHEST_PROTOCOL)})
-
-            self.con.executemany("INSERT OR IGNORE INTO estimators(name, parameters) VALUES(:name, :parameters)",
-                                 estimator_list)
-            self.con.commit()
-        except sqlite3.Error as e:
-            logging.exception(e)
-
-    def update_preprocessors(self, preprocessors: List[Preprocessor]):
-        try:
-            preprocessor_list = []
-            for p in preprocessors:
-                preprocessor_list.append(
-                    {"name": p.name, "parameters": pickle.dumps(p.instance.traits(), protocol=pickle.HIGHEST_PROTOCOL)})
-
-            self.con.executemany("INSERT OR IGNORE INTO preprocessors(name, parameters) VALUES(:name, :parameters)",
-                                 preprocessor_list)
-            self.con.commit()
-        except sqlite3.Error as e:
-            logging.exception(e)
 
     def update_result(self, result: EstimationResult):
         try:
@@ -424,48 +510,6 @@ class BenchmarkDatabase:
             # noinspection PyTypeChecker
             return hashlib.file_digest(f, hashlib.sha256).hexdigest()
 
-    def update_files(self, client: dask.distributed.Client, locations):
-        hash_tasks = []
-
-        # Glob 'em, hash 'em, and INSERT 'em
-        for s in locations:
-            path = Path(s)
-            logging.debug(f"Entering directory '{path}'")
-            for file in filter(lambda f: f.is_file(), path.glob("**/*")):
-                future = client.submit(self._hash_file, file)
-                future.context = (str(file), os.path.relpath(file, path), file.stat().st_size)
-                hash_tasks.append(future)
-
-        for future, result in dask.distributed.as_completed(hash_tasks, with_results=True):
-            self.update_file(InputFile(result, future.context[0], future.context[1], future.context[2]))
-
-    def update_tags(self, tags_csv: Path):
-        try:
-            with open(tags_csv, "r") as f:
-                reader = csv.DictReader(f, restkey="Tags")
-                unique_tags = set()
-                file_tags: List[Tuple[str, str]] = []
-                for row in reader:
-                    tags: List[str] = (row["Keywords"] + (row["Tags"] if "Tags" in row.keys() else "")
-                                       ).replace(";", "").split(" ")
-                    unique_tags.update(map(lambda x: (x.lower(),), tags))
-
-                    for tag in tags:
-                        file_tags.append(("RAISE/" + row["File"], tag.lower()))
-
-                self.con.executemany("INSERT OR IGNORE INTO tag_types(tag_name) VALUES(?)", unique_tags)
-                self.con.commit()
-
-                self.con.executemany(
-                    """
-                    INSERT OR IGNORE INTO file_tags
-                    VALUES ((SELECT file_hash FROM files WHERE ? = files.name),
-                            (SELECT tag_id from tag_types WHERE ? = tag_types.tag_name))
-                    """, file_tags)
-                self.con.commit()
-        except:
-            logging.exception(f"Error reading {tags_csv}")
-
     @staticmethod
     def _compress_file(compressor: Compressor, f: InputFile) -> Optional[Tuple[InputFile, Compressor, float]]:
         try:
@@ -473,30 +517,3 @@ class BenchmarkDatabase:
                 return f, compressor, compressor.instance.run(fd.read())
         except ValueError as e:
             logging.warning(e)
-
-    def update_compression_results(self, client: dask.distributed.Client, compressors: List[Compressor]):
-        ratio_start_time = default_timer()
-        compression_tasks = []
-        submitted_compression_tasks = 0
-        completed_compression_tasks = 0
-
-        for job in self.get_missing_compression_results():
-            future = client.submit(self._compress_file,
-                                   next(filter(lambda x: x.name == job[1], compressors)), job[0])
-            compression_tasks.append(future)
-            submitted_compression_tasks += 1
-
-        for future, result in dask.distributed.as_completed(compression_tasks, with_results=True):
-            self.update_compression_result(
-                CompressionResult(result[0].hash, result[1].name, result[2]))
-            completed_compression_tasks += 1
-            logging.info(
-                f"{completed_compression_tasks}/{submitted_compression_tasks} tasks complete, {completed_compression_tasks / submitted_compression_tasks * 100:.2f}%")
-
-        logging.info(
-            f"Calculated {completed_compression_tasks} new compression ratios in {default_timer() - ratio_start_time:.3f} seconds")
-
-    # def check_estimation_done(self, preprocessor: str, estimator: str, compressor: Compressor) -> bool:
-    #     return self.con.execute("""SELECT COUNT(1) FROM file_estimations WHERE
-    #                                file_estimations.preprocessor_id=(SELECT preprocessor_id from preprocessors WHERE name=?) AND
-    #     """, ()).fetchone() > 0
