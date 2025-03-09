@@ -26,7 +26,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from dataclasses import dataclass
-from typing import NamedTuple, List, Self
+from typing import NamedTuple, List, Self, Callable, Optional
 
 import numpy as np
 
@@ -46,9 +46,23 @@ FriendlyMetric = NamedTuple("Metric", [("file_name", str), ("preprocessor", str)
 
 
 @dataclass
+class EstimationTask:
+    hash: str
+    path: str
+    name: str
+    size_bytes: int
+    preprocessor_name: str
+    estimator_name: str
+    block_summary_func_name: Optional[str]
+    file_summary_func_name: Optional[str]
+
+
+@dataclass
 class Estimator:
     name: str
     instance: EstimatorBase
+    summarize_block: bool = False
+    summarize_file: bool = False
 
 
 @dataclass
@@ -64,6 +78,20 @@ class Preprocessor:
 
 
 @dataclass
+class BlockSummaryFunc:
+    name: str
+    instance: Callable
+    parameters: Optional[dict] = None
+
+
+@dataclass
+class FileSummaryFunc:
+    name: str
+    instance: Callable
+    parameters: Optional[dict] = None
+
+
+@dataclass
 class LoadedData:
     data: np.ndarray
     completed_stages: List[str]
@@ -76,6 +104,8 @@ class IntermediateEstimationResult:
     completed_stages: List[str]
     input_file: InputFile
     preprocessor: Preprocessor
+    block_summary: Optional[BlockSummaryFunc]
+    file_summary: Optional[FileSummaryFunc]
 
 
 @dataclass
@@ -85,10 +115,13 @@ class EstimationResult:
     input_file: InputFile
     preprocessor: Preprocessor
     estimator: Estimator
+    block_summary: Optional[BlockSummaryFunc]
+    file_summary: Optional[FileSummaryFunc]
 
     @classmethod
     def from_intermediate_result(cls, ir: IntermediateEstimationResult, value: int | float,
                                  estimator: Estimator) -> Self:
         return EstimationResult(value=value, completed_stages=ir.completed_stages + [estimator.name],
                                 input_file=ir.input_file,
-                                preprocessor=ir.preprocessor, estimator=estimator)
+                                preprocessor=ir.preprocessor, estimator=estimator, block_summary=ir.block_summary,
+                                file_summary=ir.file_summary)

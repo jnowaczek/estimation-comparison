@@ -47,7 +47,7 @@ from estimation_comparison.data_collection.summary_stats import max_outside_midd
     proportion_above_metric_cutoff
 from estimation_comparison.database import BenchmarkDatabase
 from estimation_comparison.model import Compressor, Estimator, Preprocessor, InputFile, IntermediateEstimationResult, \
-    EstimationResult, LoadedData
+    EstimationResult, LoadedData, BlockSummaryFunc, FileSummaryFunc
 
 
 class Benchmark:
@@ -68,41 +68,43 @@ class Benchmark:
             Preprocessor(name="linear_random_75%", instance=LinearSampler(fraction=0.75)),
         ]
 
+        self._block_summary_funcs: List[BlockSummaryFunc] = [
+            BlockSummaryFunc(name="max_outside_middle_notch_64",
+                             instance=max_outside_middle_notch,
+                             parameters={"notch_width": 64}
+                             ),
+            BlockSummaryFunc(name="lag_1",
+                             instance=autocorrelation_lag,
+                             parameters={"lag": 1}
+                             ),
+            BlockSummaryFunc(name="lag_3",
+                             instance=autocorrelation_lag,
+                             parameters={"lag": 3}
+                             ),
+        ]
+
+        self._block_summary_funcs += [BlockSummaryFunc(name=f"proportion_above_metric_cutoff_{x / 100}",
+                             instance=proportion_above_metric_cutoff,
+                             parameters={"cutoff": {x / 100}}
+                             ) for x in range(5, 100, 5)]
+
+        self._file_summary_funcs: List[FileSummaryFunc] = [
+            FileSummaryFunc(name="mean",
+                            instance=np.mean
+                            ),
+        ]
+
         self._estimators: List[Estimator] = [
             Estimator(
-                name="autocorrelation_972_64_notch_mean",
+                name="autocorrelation_972",
                 instance=Autocorrelation(
-                    block_size=972,
-                    block_summary_fn=functools.partial(max_outside_middle_notch, notch_width=64),
-                    file_summary_fn=np.mean
-                )
+                    block_size=972
+                ),
+                summarize_block=True,
+                summarize_file=True
             ),
             Estimator(name="bytecount_file", instance=ByteCount()),
             Estimator(name="entropy_bits", instance=Entropy()),
-            Estimator(
-                name="autocorrelation_972_lag_1_mean",
-                instance=Autocorrelation(
-                    block_size=972,
-                    block_summary_fn=functools.partial(autocorrelation_lag, lag=1),
-                    file_summary_fn=np.mean
-                )
-            ),
-            Estimator(
-                name="autocorrelation_972_lag_3_mean",
-                instance=Autocorrelation(
-                    block_size=972,
-                    block_summary_fn=functools.partial(autocorrelation_lag, lag=3),
-                    file_summary_fn=np.mean
-                )
-            ),
-            Estimator(
-                name="autocorrelation_972_fraction_above_0.25_mean",
-                instance=Autocorrelation(
-                    block_size=972,
-                    block_summary_fn=functools.partial(proportion_above_metric_cutoff, cutoff=0.25),
-                    file_summary_fn=np.mean
-                )
-            ),
         ]
 
         self._compressors: List[Compressor] = [
@@ -127,6 +129,10 @@ class Benchmark:
         self.database.update_estimators(self._estimators)
         logging.info("Updating benchmark database preprocessor list")
         self.database.update_preprocessors(self._preprocessors)
+        logging.info("Updating benchmark database block summary function lists")
+        self.database.update_block_summary_funcs(self._block_summary_funcs)
+        logging.info("Updating benchmark database file summary function lists")
+        self.database.update_file_summary_funcs(self._file_summary_funcs)
         logging.info("Updating benchmark database file hash list")
         self.database.update_files(self.client, self.data_locations)
         if self._tags_csv is not None:
@@ -180,42 +186,12 @@ class Benchmark:
                 estimation_results.append(
                     self.client.submit(self._run_estimator, estimator=estimator_instance, ir=preprocessed))
 
-            # input_files = self.database.get_all_files()
-            # loaded_files = self.client.map(self._load_file, input_files, priority=0)
-            #
-            # preprocessed = []
-            # for p in self._preprocessors:
-            #     for file in loaded_files:
-            #         preprocessed.append(self.client.submit(functools.partial(self._preprocess_file, p), file, priority=0))
-            # # preprocessed = self.client.map(self._preprocess_file, self._preprocessors, loaded_files)
-            # del loaded_files
-            #
-            # results = []
-            # for e in self._estimators:
-            #     for future in preprocessed:
-            #         try:
-            #             if not self.database.get_all_metric():
-            #                 # noinspection PyTypeChecker
-            #                 results.append(
-            #                     self.client.submit(functools.partial(self._run_estimator, e), future, priority=10))
-            #             else:
-            #                 completed_tasks += 1
-            #         except Exception as ex:
-            #             logging.exception(f"Running estimator raised exception\n\t{ex})")
-            # del preprocessed
-
             for future, result in as_completed(estimation_results, with_results=True):
                 completed_tasks += 1
                 logging.info(
                     f"{completed_tasks}/{len(estimation_tasks)} estimation tasks complete, {completed_tasks / len(estimation_tasks) * 100:.2f}%")
                 try:
                     self.database.update_result(result)
-                    # self.database.update_metric(
-                    #     Metric(result.input_file.hash, result.completed_stages[-1],
-                    #            pickle.dumps(result.value, pickle.HIGHEST_PROTOCOL)))
-                    # self.results[future.context["file"].name] |= {
-                    #     f"{future.context["estimator_name"]} Parameters": future.context["estimator_instance"].parameters,
-                    #     f"{future.context["estimator_name"]}": future.result()}
                 except Exception as e:
                     logging.exception(f"Input file '{result.input_file.name}' raised exception\n\t{e}")
 

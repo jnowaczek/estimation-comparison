@@ -51,7 +51,7 @@ from typing import Tuple, List, Optional
 import dask.distributed
 
 from estimation_comparison.model import InputFile, FriendlyRatio, FriendlyMetric, Compressor, Estimator, \
-    Preprocessor, EstimationResult, CompressionResult
+    Preprocessor, EstimationResult, CompressionResult, FileSummaryFunc, BlockSummaryFunc, EstimationTask
 
 
 class BenchmarkDatabase:
@@ -115,7 +115,9 @@ class BenchmarkDatabase:
             (
                 estimator_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                 name         TEXT                              NOT NULL UNIQUE,
-                parameters   BLOB
+                parameters   BLOB,
+                summarize_block BOOLEAN NOT NULL,
+                summarize_file BOOLEAN NOT NULL
             )
             """)
         self.con.commit()
@@ -126,8 +128,10 @@ class BenchmarkDatabase:
                 file_hash REFERENCES files (file_hash)                     NOT NULL,
                 preprocessor_id REFERENCES preprocessors (preprocessor_id) NOT NULL,
                 estimator_id REFERENCES estimators (estimator_id)          NOT NULL,
+                block_summary_func_id REFERENCES block_summary_funcs (block_summary_id),
+                file_summary_func_id REFERENCES file_summary_funcs (file_summary_id),
                 metric REAL                                                NOT NULL,
-                UNIQUE (file_hash, preprocessor_id, estimator_id) ON CONFLICT REPLACE
+                UNIQUE (file_hash, preprocessor_id, estimator_id, block_summary_func_id, file_summary_func_id) ON CONFLICT REPLACE
             )
             """)
         self.con.commit()
@@ -143,7 +147,7 @@ class BenchmarkDatabase:
         self.con.commit()
         self.con.execute(
             """
-            CREATE TABLE IF NOT EXISTS block_summary_stats
+            CREATE TABLE IF NOT EXISTS block_summary_funcs
             (
                 block_summary_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                 name             TEXT                              NOT NULL UNIQUE,
@@ -154,7 +158,7 @@ class BenchmarkDatabase:
         self.con.commit()
         self.con.execute(
             """
-            CREATE TABLE IF NOT EXISTS file_summary_stats
+            CREATE TABLE IF NOT EXISTS file_summary_funcs
             (
                 file_summary_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                 name            TEXT                              NOT NULL UNIQUE,
@@ -169,10 +173,14 @@ class BenchmarkDatabase:
             estimator_list = []
             for e in estimators:
                 estimator_list.append(
-                    {"name": e.name, "parameters": pickle.dumps(e.instance.traits(), protocol=pickle.HIGHEST_PROTOCOL)})
+                    {"name": e.name, "parameters": pickle.dumps(e.instance.traits(), protocol=pickle.HIGHEST_PROTOCOL),
+                     "summarize_block": e.summarize_block, "summarize_file": e.summarize_file})
 
-            self.con.executemany("INSERT OR IGNORE INTO estimators(name, parameters) VALUES(:name, :parameters)",
-                                 estimator_list)
+            self.con.executemany(
+                """
+                INSERT OR IGNORE INTO estimators(name, parameters, summarize_block, summarize_file)
+                VALUES (:name, :parameters, :summarize_block, :summarize_file)
+                """, estimator_list)
             self.con.commit()
         except sqlite3.Error as e:
             logging.exception(e)
@@ -203,6 +211,34 @@ class BenchmarkDatabase:
         except sqlite3.Error as e:
             logging.exception(e)
 
+    def update_block_summary_funcs(self, block_funcs: List[BlockSummaryFunc]):
+        try:
+            block_func_list = []
+            for f in block_funcs:
+                block_func_list.append(
+                    {"name": f.name, "parameters": pickle.dumps(f.parameters, protocol=pickle.HIGHEST_PROTOCOL)})
+
+            self.con.executemany(
+                "INSERT OR IGNORE INTO block_summary_funcs(name, parameters) VALUES(:name, :parameters)",
+                block_func_list)
+            self.con.commit()
+        except sqlite3.Error as e:
+            logging.exception(e)
+
+    def update_file_summary_funcs(self, file_funcs: List[FileSummaryFunc]):
+        try:
+            file_func_list = []
+            for f in file_funcs:
+                file_func_list.append(
+                    {"name": f.name, "parameters": pickle.dumps(f.parameters, protocol=pickle.HIGHEST_PROTOCOL)})
+
+            self.con.executemany(
+                "INSERT OR IGNORE INTO file_summary_funcs(name, parameters) VALUES(:name, :parameters)",
+                file_func_list)
+            self.con.commit()
+        except sqlite3.Error as e:
+            logging.exception(e)
+
     def update_file(self, file: InputFile):
         try:
             self.con.execute(
@@ -213,9 +249,7 @@ class BenchmarkDatabase:
                         DO UPDATE SET path       = :path,
                                       name       = :name,
                                       size_bytes = :size_bytes
-                    """,
-                file
-            )
+                    """, file)
             self.con.commit()
         except sqlite3.Error as e:
             logging.exception(e)
@@ -265,9 +299,9 @@ class BenchmarkDatabase:
     def update_compression_result(self, new_result: CompressionResult):
         try:
             self.con.execute(
-                """INSERT INTO compression_results VALUES(:hash, (SELECT compressor_id FROM compressors WHERE name=:compressor_name), :size_bytes)""",
-                new_result
-            )
+                """INSERT INTO compression_results
+                       VALUES (:hash, (SELECT compressor_id FROM compressors WHERE name = :compressor_name), :size_bytes)
+                       """, new_result)
             self.con.commit()
         except sqlite3.Error as e:
             logging.exception(e)
@@ -348,35 +382,70 @@ class BenchmarkDatabase:
             results.append((InputFile(row[0], row[1], row[2], row[3]), row[4]))
         return results
 
-    def get_missing_estimation_results(self) -> (InputFile, str, str):
+    def get_missing_estimation_results(self) -> [EstimationTask]:
         results = []
+        # Phew, all hail the mighty CTE
         for row in self.con.execute(
                 """
-                SELECT result.fh,
-                       result.file_path,
-                       result.file_name,
-                       result.uncompressed_size_bytes,
-                       result.preprocessor_name,
-                       result.estimator_name
+                WITH estimators_without_summary_func as (SELECT estimator_id, name AS est_name
+                                                         FROM estimators
+                                                         WHERE summarize_block = FALSE
+                                                           AND summarize_file = FALSE),
+                     estimators_with_file_summary_func AS (SELECT estimator_id, name AS est_name
+                                                           FROM estimators
+                                                           WHERE summarize_block = FALSE
+                                                             AND summarize_file = TRUE),
+                     estimators_with_block_summary_func AS (SELECT estimator_id, name AS est_name
+                                                            FROM estimators
+                                                            WHERE summarize_block = TRUE
+                                                              AND summarize_file = TRUE),
+                     file_summary_permutations AS (SELECT estimator_id, est_name, fsf.name AS fsf_name
+                                                   FROM estimators_with_file_summary_func
+                                                            CROSS JOIN file_summary_funcs fsf),
+                     block_summary_permutations AS (SELECT estimator_id, est_name, bsf.name AS bsf_name, fsf.name AS fsf_name
+                                                    FROM estimators_with_block_summary_func
+                                                             CROSS JOIN block_summary_funcs bsf
+                                                             CROSS JOIN file_summary_funcs fsf),
+                     estimator_permutations AS (SELECT estimator_id,
+                                                       est_name,
+                                                       NULL AS bsf_name,
+                                                       NULL AS fsf_name
+                                                FROM estimators_without_summary_func
+                                                UNION
+                                                SELECT estimator_id, est_name, NULL AS bsf_name, fsf_name
+                                                FROM file_summary_permutations
+                                                UNION
+                                                SELECT estimator_id, est_name, bsf_name, fsf_name
+                                                FROM block_summary_permutations)
+                SELECT r.fh,
+                       r.file_path,
+                       r.file_name,
+                       r.uncompressed_size_bytes,
+                       r.preprocessor_name,
+                       r.estimator_name,
+                       r.block_summary_func_name,
+                       r.file_summary_func_name
                 FROM ((SELECT DISTINCT file_hash          AS fh,
-                                       estimator_id,
+                                       ep.estimator_id,
                                        preprocessor_id,
                                        files.name         AS file_name,
                                        files.path         AS file_path,
                                        files.size_bytes   as uncompressed_size_bytes,
                                        preprocessors.name AS preprocessor_name,
-                                       estimators.name    AS estimator_name
+                                       ep.est_name        AS estimator_name,
+                                       bsf_name           AS block_summary_func_name,
+                                       fsf_name           AS file_summary_func_name
                        FROM files
-                                CROSS JOIN estimators
+                                CROSS JOIN estimator_permutations ep
                                 CROSS JOIN preprocessors) permutations
                     LEFT JOIN file_estimations ON
                     (file_estimations.file_hash = permutations.fh AND
                      file_estimations.preprocessor_id = permutations.preprocessor_id AND
-                     file_estimations.estimator_id = permutations.estimator_id)) result
-                WHERE result.metric IS NULL
+                     file_estimations.estimator_id = permutations.estimator_id)) r
+                WHERE r.metric IS NULL
                 """
         ).fetchall():
-            results.append((InputFile(row[0], row[1], row[2], row[3]), row[4], row[5]))
+            results.append(InputFile(*row))
         return results
 
     def update_result(self, result: EstimationResult):
@@ -387,9 +456,12 @@ class BenchmarkDatabase:
                 VALUES (?,
                         (SELECT preprocessor_id FROM preprocessors WHERE name = ?),
                         (SELECT estimator_id FROM estimators WHERE name = ?),
+                        (SELECT block_summary_func_id FROM block_summary_funcs WHERE name = ?),
+                        (SELECT file_summary_func_id FROM file_summary_funcs WHERE name = ?),
                         ?)
                 """,
                 (result.input_file.hash, result.preprocessor.name, result.estimator.name,
+                 result.block_summary.name, result.file_summary.name,
                  result.value[0] if isinstance(result.value, list) and len(result.value) == 1 else result.value)
             )
             self.con.commit()
