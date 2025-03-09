@@ -26,7 +26,6 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import argparse
-import functools
 import itertools
 import logging
 import pathlib
@@ -84,9 +83,9 @@ class Benchmark:
         ]
 
         self._block_summary_funcs += [BlockSummaryFunc(name=f"proportion_above_metric_cutoff_{x / 100}",
-                             instance=proportion_above_metric_cutoff,
-                             parameters={"cutoff": {x / 100}}
-                             ) for x in range(5, 100, 5)]
+                                                       instance=proportion_above_metric_cutoff,
+                                                       parameters={"cutoff": {x / 100}}
+                                                       ) for x in range(5, 100, 5)]
 
         self._file_summary_funcs: List[FileSummaryFunc] = [
             FileSummaryFunc(name="mean",

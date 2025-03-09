@@ -104,8 +104,6 @@ class IntermediateEstimationResult:
     completed_stages: List[str]
     input_file: InputFile
     preprocessor: Preprocessor
-    block_summary: Optional[BlockSummaryFunc]
-    file_summary: Optional[FileSummaryFunc]
 
 
 @dataclass
@@ -123,5 +121,5 @@ class EstimationResult:
                                  estimator: Estimator) -> Self:
         return EstimationResult(value=value, completed_stages=ir.completed_stages + [estimator.name],
                                 input_file=ir.input_file,
-                                preprocessor=ir.preprocessor, estimator=estimator, block_summary=ir.block_summary,
-                                file_summary=ir.file_summary)
+                                preprocessor=ir.preprocessor, estimator=estimator, block_summary=None,
+                                file_summary=None)
