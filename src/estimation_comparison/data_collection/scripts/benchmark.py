@@ -191,7 +191,7 @@ class Benchmark:
                 logging.info(
                     f"{completed_tasks}/{len(estimation_tasks)} estimation tasks complete, {completed_tasks / len(estimation_tasks) * 100:.2f}%")
                 try:
-                    self.database.update_result(result)
+                    self.database.update_estimation_result(result)
                 except Exception as e:
                     logging.exception(f"Input file '{result.input_file.name}' raised exception\n\t{e}")
 

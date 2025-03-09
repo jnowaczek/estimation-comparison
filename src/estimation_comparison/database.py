@@ -448,7 +448,7 @@ class BenchmarkDatabase:
             results.append(InputFile(*row))
         return results
 
-    def update_result(self, result: EstimationResult):
+    def update_estimation_result(self, result: EstimationResult):
         try:
             self.con.execute(
                 """
@@ -501,6 +501,20 @@ class BenchmarkDatabase:
             """
             SELECT compressor_id, name
             FROM compressors
+            """).fetchall()
+
+    def get_block_summary_funcs(self) -> [(int, str)]:
+        return self.con.execute(
+            """
+            SELECT block_summary_id, name
+            FROM block_summary_funcs
+            """).fetchall()
+
+    def get_file_summary_funcs(self) -> [(int, str)]:
+        return self.con.execute(
+            """
+            SELECT file_summary_id, name
+            FROM file_summary_funcs
             """).fetchall()
 
     def get_tags(self) -> [(int, str)]:
