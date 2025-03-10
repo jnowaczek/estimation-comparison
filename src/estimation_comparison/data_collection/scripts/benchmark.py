@@ -12,19 +12,6 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-#  This program is free software: you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation, either version 3 of the License, or
-#  (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import argparse
 import itertools
 import logging
@@ -33,6 +20,7 @@ from pathlib import Path
 from timeit import default_timer
 from typing import List, Optional
 
+import dask.array
 import numpy as np
 from dask.distributed import Client, as_completed
 from imagecodecs import tiff_check, tiff_decode
@@ -118,8 +106,7 @@ class Benchmark:
             Compressor(name="zstd", instance=ZstandardCompressor()),
         ]
 
-        # dask.config.set(scheduler="single-threaded")
-        self.client = Client(n_workers=1)
+        self.client = Client()
         logging.info(f"Dask dashboard available: {self.client.dashboard_link}")
 
     def update_database(self):
@@ -147,9 +134,9 @@ class Benchmark:
             with open(file.path, "rb") as f:
                 data = f.read()
                 if tiff_check(data):
-                    return LoadedData(data=tiff_decode(data), input_file=file)
+                    return LoadedData(data=dask.array.from_array(tiff_decode(data), chunks=100), input_file=file)
                 else:
-                    return LoadedData(data=np.frombuffer(data), input_file=file)
+                    return LoadedData(data=dask.array.from_array(data, chunks=100), input_file=file)
         except OSError as e:
             logging.exception(f"Error reading {file}: {e}")
 
@@ -192,7 +179,7 @@ class Benchmark:
 
         estimation_tasks = self.database.get_missing_estimation_results()
 
-        for batch in itertools.batched(estimation_tasks[:100], 1):
+        for batch in itertools.batched(estimation_tasks[:10], 10):
             estimation_results = []
             for task in batch:
                 loaded_file = self.client.submit(self._load_file, file=task.input_file)
@@ -213,9 +200,9 @@ class Benchmark:
                 estimated = self.client.submit(self._run_estimator, estimator=estimator, bsf=bsf,
                                                fsf=fsf, ppd=preprocessed)
 
-                # block_summarized = self.client.submit(self._run_block_summary, ier=estimated)
-                #
-                # estimation_results.append(self.client.submit(self._run_file_summary, ier=block_summarized))
+                block_summarized = self.client.submit(self._run_block_summary, ier=estimated)
+
+                estimation_results.append(self.client.submit(self._run_file_summary, ier=block_summarized))
 
             for future, result in as_completed(estimation_results, with_results=True):
                 completed_tasks += 1
