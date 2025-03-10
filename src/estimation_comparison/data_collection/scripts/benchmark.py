@@ -134,9 +134,12 @@ class Benchmark:
             with open(file.path, "rb") as f:
                 data = f.read()
                 if tiff_check(data):
-                    return LoadedData(data=dask.array.from_array(tiff_decode(data), chunks=100), input_file=file)
+                    data = tiff_decode(data)
+                    data = np.reshape(data, (-1,))
+                    data = dask.array.from_array(data, chunks=972)
+                    return LoadedData(data=data, input_file=file)
                 else:
-                    return LoadedData(data=dask.array.from_array(data, chunks=100), input_file=file)
+                    return LoadedData(data=dask.array.from_array(data, chunks=972), input_file=file)
         except OSError as e:
             logging.exception(f"Error reading {file}: {e}")
 
@@ -158,7 +161,8 @@ class Benchmark:
     def _run_block_summary(ier: IntermediateEstimationResult) -> IntermediateEstimationResult | None:
         try:
             if ier.block_summary_func is not None:
-                ier.result = ier.block_summary_func.instance(ier.result, **ier.block_summary_func.parameters)
+                ier.result = ier.block_summary_func.instance(ier.result, **(
+                    ier.block_summary_func.parameters if ier.block_summary_func.parameters is not None else {}))
             return ier
         except Exception as e:
             logging.exception(f"Error running {ier.block_summary_func} on {ier.input_file}: {e}")
@@ -168,7 +172,8 @@ class Benchmark:
         try:
             if ier.file_summary_func is not None:
                 return EstimationResult.from_intermediate_result(
-                    ier, value=ier.file_summary_func.instance(ier.result, **ier.file_summary_func.parameters))
+                    ier, value=ier.file_summary_func.instance(ier.result, **(
+                        ier.file_summary_func.parameters if ier.file_summary_func.parameters is not None else {})))
             return EstimationResult.from_intermediate_result(ier, ier.result)
         except Exception as e:
             logging.exception(f"Error running {ier.file_summary_func} on {ier.input_file}: {e}")
