@@ -37,25 +37,19 @@ from estimation_comparison.data_collection.estimator.base import EstimatorBase
 
 class Autocorrelation(EstimatorBase):
     block_size = Int(1024)
-    block_summary_fn = Callable()
-    file_summary_fn = Callable()
 
     def estimate(self, data: np.ndarray) -> any:
-        acf = []
-        flat = data.tobytes()
-        del data
-        for block in itertools.batched(flat, self.block_size):
-            mean = np.mean(block)
-            normalized_block = np.subtract(block, mean)
-            numerator = signal.correlate(normalized_block, normalized_block)
-            denominator = np.sum(normalized_block * normalized_block)
-            del normalized_block
-            block_result = np.divide(numerator, denominator, out=np.zeros_like(numerator), where=denominator != 0,
-                                     dtype=float)
-            del numerator, denominator
-            block_result = self.block_summary_fn(block_result)
-            acf.append(block_result)
-            del block_result
+        def normalize(block):
+            return np.subtract(block, np.mean(block))
 
-        acf = self.file_summary_fn(acf)
-        return acf
+        def autocorrelate(block):
+            return signal.correlate(block, block)
+
+        normalized = np.apply_along_axis(normalize, 1, data.reshape((self.block_size, -1)))
+        numerators = np.apply_along_axis(autocorrelate, 1, normalized)
+        denominators = np.apply_along_axis(autocorrelate, 1, normalized)
+        block_result = np.divide(numerators, denominators, out=np.zeros_like(numerators), where=denominators != 0,
+                                     dtype=np.float16)
+        del numerators, denominators
+
+        return block_result

@@ -50,8 +50,9 @@ from typing import Tuple, List, Optional
 
 import dask.distributed
 
-from estimation_comparison.model import InputFile, FriendlyRatio, FriendlyMetric, Compressor, Estimator, \
-    Preprocessor, EstimationResult, CompressionResult, FileSummaryFunc, BlockSummaryFunc, EstimationTask
+from estimation_comparison.model import InputFile, Compressor, Estimator, \
+    Preprocessor, EstimationResult, CompressionResult, FileSummaryFunc, BlockSummaryFunc, EstimationTask, \
+    CompressionTask
 
 
 class BenchmarkDatabase:
@@ -240,22 +241,20 @@ class BenchmarkDatabase:
             logging.exception(e)
 
     def update_file(self, file: InputFile):
-        try:
-            self.con.execute(
-                """
-                    INSERT INTO files
-                    VALUES (:hash, :path, :name, :size_bytes)
-                    ON CONFLICT(file_hash)
-                        DO UPDATE SET path       = :path,
-                                      name       = :name,
-                                      size_bytes = :size_bytes
-                    """, file)
-            self.con.commit()
-        except sqlite3.Error as e:
-            logging.exception(e)
+        self.con.execute(
+            """
+                INSERT OR ABORT INTO files
+                VALUES (:hash, :path, :name, :size_bytes)
+                """, (file.hash, file.path, file.name, file.size_bytes))
+        self.con.commit()
 
     def update_files(self, client: dask.distributed.Client, locations):
         hash_tasks = []
+        duplicate_files = 0
+
+        # noinspection SqlWithoutWhere
+        self.con.execute("DELETE FROM files")
+        self.con.commit()
 
         # Glob 'em, hash 'em, and INSERT 'em
         for s in locations:
@@ -267,7 +266,16 @@ class BenchmarkDatabase:
                 hash_tasks.append(future)
 
         for future, result in dask.distributed.as_completed(hash_tasks, with_results=True):
-            self.update_file(InputFile(result, future.context[0], future.context[1], future.context[2]))
+            try:
+                self.update_file(InputFile(result, future.context[0], future.context[1], future.context[2]))
+            except sqlite3.IntegrityError as e:
+                logging.debug(f"Ignoring file '{future.context[1]}': {e}")
+                duplicate_files += 1
+
+        if duplicate_files:
+            logging.warning(
+                f"Ignored {duplicate_files} files with hash collisions. Debug mode (-v) can provide additional details")
+        logging.info(f"Finished hashing {len(hash_tasks)} files")
 
     def update_tags(self, tags_csv: Path):
         try:
@@ -293,7 +301,7 @@ class BenchmarkDatabase:
                             (SELECT tag_id from tag_types WHERE ? = tag_types.tag_name))
                     """, file_tags)
                 self.con.commit()
-        except:
+        except OSError:
             logging.exception(f"Error reading {tags_csv}")
 
     def update_compression_result(self, new_result: CompressionResult):
@@ -301,7 +309,7 @@ class BenchmarkDatabase:
             self.con.execute(
                 """INSERT INTO compression_results
                        VALUES (:hash, (SELECT compressor_id FROM compressors WHERE name = :compressor_name), :size_bytes)
-                       """, new_result)
+                       """, (new_result.input_file.hash, new_result.compressor.name, new_result.input_file.size_bytes))
             self.con.commit()
         except sqlite3.Error as e:
             logging.exception(e)
@@ -314,16 +322,19 @@ class BenchmarkDatabase:
 
         for job in self.get_missing_compression_results():
             future = client.submit(self._compress_file,
-                                   next(filter(lambda x: x.name == job[1], compressors)), job[0])
+                                   compressor=next(filter(lambda x: x.name == job.compressor_name, compressors)),
+                                   f=job.input_file)
             compression_tasks.append(future)
             submitted_compression_tasks += 1
 
         for future, result in dask.distributed.as_completed(compression_tasks, with_results=True):
-            self.update_compression_result(
-                CompressionResult(result[0].hash, result[1].name, result[2]))
-            completed_compression_tasks += 1
-            logging.info(
-                f"{completed_compression_tasks}/{submitted_compression_tasks} tasks complete, {completed_compression_tasks / submitted_compression_tasks * 100:.2f}%")
+            if isinstance(result, CompressionResult):
+                self.update_compression_result(
+                    CompressionResult(input_file=result.input_file, compressor=result.compressor,
+                                      compressed_size_bytes=result.compressed_size_bytes))
+                completed_compression_tasks += 1
+                logging.info(
+                    f"{completed_compression_tasks}/{submitted_compression_tasks} tasks complete, {completed_compression_tasks / submitted_compression_tasks * 100:.2f}%")
 
         logging.info(
             f"Calculated {completed_compression_tasks} new compression ratios in {default_timer() - ratio_start_time:.3f} seconds")
@@ -336,7 +347,7 @@ class BenchmarkDatabase:
     def input_file_count(self) -> int:
         return self.con.execute("SELECT COUNT(*) FROM files").fetchone()[0]
 
-    def get_compression_results_for_file(self, file_hash: str):
+    def get_compression_results_for_file(self, file_hash: str) -> List[CompressionResult]:
         results = []
         for row in self.con.execute(
                 """
@@ -350,28 +361,16 @@ class BenchmarkDatabase:
             results.append(CompressionResult(*row))
         return results
 
-    def get_all_compression_results(self):
-        results = []
+    def get_missing_compression_results(self) -> List[CompressionTask]:
+        results: [CompressionTask] = []
         for row in self.con.execute(
                 """
-                SELECT (SELECT name FROM files where compression_results.file_hash = files.file_hash),
-                       (SELECT name FROM compressors WHERE compression_results.compressor_id = compressors.compressor_id),
-                       size_bytes
-                FROM compression_results
-                """).fetchall():
-            results.append(FriendlyRatio(*row, ))
-        return results
-
-    def get_missing_compression_results(self) -> (InputFile, str):
-        results = []
-        for row in self.con.execute(
-                """
-                SELECT combi.file_hash, combi.file_path, combi.file_name, combi.uncompressed_size_bytes, combi.compressor_name
+                SELECT combi.file_hash, combi.file_name, combi.file_path, combi.uncompressed_size_bytes, combi.compressor_name
                 FROM (SELECT DISTINCT file_hash,
-                                      compressor_id,
-                                      files.name       AS file_name,
                                       files.path       AS file_path,
+                                      files.name       AS file_name,
                                       files.size_bytes AS uncompressed_size_bytes,
+                                      compressor_id,
                                       compressors.name AS compressor_name
                       FROM files
                                CROSS JOIN compressors) combi
@@ -379,10 +378,12 @@ class BenchmarkDatabase:
                     c.file_hash = combi.file_hash AND c.compressor_id = combi.compressor_id
                 WHERE c.size_bytes IS NULL
                 """).fetchall():
-            results.append((InputFile(row[0], row[1], row[2], row[3]), row[4]))
+            results.append(
+                CompressionTask(input_file=InputFile(hash=row[0], name=row[1], path=row[2], size_bytes=row[3]),
+                                compressor_name=row[4]))
         return results
 
-    def get_missing_estimation_results(self) -> [EstimationTask]:
+    def get_missing_estimation_results(self) -> List[EstimationTask]:
         results = []
         # Phew, all hail the mighty CTE
         for row in self.con.execute(
@@ -445,7 +446,10 @@ class BenchmarkDatabase:
                 WHERE r.metric IS NULL
                 """
         ).fetchall():
-            results.append(InputFile(*row))
+            results.append(
+                EstimationTask(input_file=InputFile(hash=row[0], path=row[1], name=row[2], size_bytes=row[3]),
+                               preprocessor_name=row[4], estimator_name=row[5], block_summary_func_name=row[6],
+                               file_summary_func_name=row[7]))
         return results
 
     def update_estimation_result(self, result: EstimationResult):
@@ -461,66 +465,52 @@ class BenchmarkDatabase:
                         ?)
                 """,
                 (result.input_file.hash, result.preprocessor.name, result.estimator.name,
-                 result.block_summary.name, result.file_summary.name,
+                 result.block_summary_func.name, result.file_summary_func.name,
                  result.value[0] if isinstance(result.value, list) and len(result.value) == 1 else result.value)
             )
             self.con.commit()
         except sqlite3.Error as e:
             logging.exception(e, result)
 
-    def get_all_metric(self):
-        metrics = []
-        for row in self.con.execute(
-                """
-                SELECT (SELECT name FROM files where file_estimations.file_hash = files.file_hash),
-                       (SELECT name FROM preprocessors where file_estimations.preprocessor_id = preprocessors.preprocessor_id),
-                       (SELECT name FROM estimators WHERE file_estimations.estimator_id = estimators.estimator_id),
-                       metric
-                FROM file_estimations
-                """).fetchall():
-            metrics.append(FriendlyMetric(file_name=row[0], preprocessor=row[1], estimator=row[2],
-                                          metric=row[3] if not isinstance(row[3], bytes) else pickle.loads(row[3])))
-        return metrics
-
-    def get_preprocessors(self) -> [(int, str)]:
+    def get_preprocessors(self) -> List[Tuple[int, str]]:
         return self.con.execute(
             """
             SELECT preprocessor_id, name
             FROM preprocessors
             """).fetchall()
 
-    def get_estimators(self) -> [(int, str)]:
+    def get_estimators(self) -> List[Tuple[int, str]]:
         return self.con.execute(
             """
             SELECT estimator_id, name
             FROM estimators
             """).fetchall()
 
-    def get_compressors(self) -> [(int, str)]:
+    def get_compressors(self) -> List[Tuple[int, str]]:
         return self.con.execute(
             """
             SELECT compressor_id, name
             FROM compressors
             """).fetchall()
 
-    def get_block_summary_funcs(self) -> [(int, str)]:
+    def get_block_summary_funcs(self) -> List[Tuple[int, str]]:
         return self.con.execute(
             """
             SELECT block_summary_id, name
             FROM block_summary_funcs
             """).fetchall()
 
-    def get_file_summary_funcs(self) -> [(int, str)]:
+    def get_file_summary_funcs(self) -> List[Tuple[int, str]]:
         return self.con.execute(
             """
             SELECT file_summary_id, name
             FROM file_summary_funcs
             """).fetchall()
 
-    def get_tags(self) -> [(int, str)]:
-        return self.con.execute("SELECT tag_id, tag_name FROM tag_types")
+    def get_tags(self) -> List[Tuple[int, str]]:
+        return self.con.execute("SELECT tag_id, tag_name FROM tag_types").fetchall()
 
-    def get_combinations(self) -> [(str, str, str)]:
+    def get_combinations(self) -> List[Tuple[str, str, str]]:
         return self.con.execute(
             """
             SELECT p.name, e.name, c.name
@@ -575,31 +565,35 @@ class BenchmarkDatabase:
     def get_solo_plot_dataframe(self, preprocessor: str, estimator: str, compressor: str):
         cursor = self.con.execute(
             """
-            SELECT fe.file_hash,
-                   fe.metric,
-                   f.size_bytes as initial_size,
-                   cr.size_bytes as final_size
-            FROM file_estimations fe
-                     INNER JOIN files f ON f.file_hash = fe.file_hash
-                     INNER JOIN compression_results cr ON cr.file_hash = fe.file_hash
-            WHERE metric IS NOT NULL
-              AND fe.preprocessor_id = (SELECT preprocessor_id FROM preprocessors WHERE name = ?)
-              AND fe.estimator_id = (SELECT estimator_id FROM estimators WHERE name = ?)
-              AND cr.compressor_id = (SELECT compressor_id FROM compressors WHERE name = ?)
-            ORDER BY name
-            """, (preprocessor, estimator, compressor))
+                SELECT fe.file_hash,
+                       fe.metric,
+                       f.size_bytes as initial_size,
+                       cr.size_bytes as final_size
+                FROM file_estimations fe
+                         INNER JOIN files f ON f.file_hash = fe.file_hash
+                         INNER JOIN compression_results cr ON cr.file_hash = fe.file_hash
+                WHERE metric IS NOT NULL
+                  AND fe.preprocessor_id = (SELECT preprocessor_id FROM preprocessors WHERE name = ?)
+                  AND fe.estimator_id = (SELECT estimator_id FROM estimators WHERE name = ?)
+                  AND cr.compressor_id = (SELECT compressor_id FROM compressors WHERE name = ?)
+                ORDER BY name
+                """, (preprocessor, estimator, compressor))
         return cursor.description, cursor.fetchall()
 
     @staticmethod
-    def _hash_file(p: Path) -> str:
-        with open(p, "rb") as f:
-            # noinspection PyTypeChecker
-            return hashlib.file_digest(f, hashlib.sha256).hexdigest()
+    def _hash_file(p: Path) -> Optional[str]:
+        try:
+            with open(p, "rb") as f:
+                # noinspection PyTypeChecker
+                return hashlib.file_digest(f, hashlib.sha256).hexdigest()
+        except Exception as e:
+            logging.exception(e)
 
     @staticmethod
-    def _compress_file(compressor: Compressor, f: InputFile) -> Optional[Tuple[InputFile, Compressor, float]]:
+    def _compress_file(compressor: Compressor, f: InputFile) -> Optional[CompressionResult]:
         try:
             with open(f.path, "rb") as fd:
-                return f, compressor, compressor.instance.run(fd.read())
-        except ValueError as e:
-            logging.warning(e)
+                return CompressionResult(input_file=f, compressor=compressor,
+                                         compressed_size_bytes=compressor.instance.run(fd.read()))
+        except (OSError, ValueError) as e:
+            logging.exception(e)

@@ -46,7 +46,7 @@ from estimation_comparison.data_collection.summary_stats import max_outside_midd
     proportion_above_metric_cutoff
 from estimation_comparison.database import BenchmarkDatabase
 from estimation_comparison.model import Compressor, Estimator, Preprocessor, InputFile, IntermediateEstimationResult, \
-    EstimationResult, LoadedData, BlockSummaryFunc, FileSummaryFunc
+    EstimationResult, LoadedData, BlockSummaryFunc, FileSummaryFunc, PreprocessedData
 
 
 class Benchmark:
@@ -118,7 +118,8 @@ class Benchmark:
             Compressor(name="zstd", instance=ZstandardCompressor()),
         ]
 
-        self.client = Client()
+        # dask.config.set(scheduler="single-threaded")
+        self.client = Client(n_workers=1)
         logging.info(f"Dask dashboard available: {self.client.dashboard_link}")
 
     def update_database(self):
@@ -132,13 +133,13 @@ class Benchmark:
         self.database.update_block_summary_funcs(self._block_summary_funcs)
         logging.info("Updating benchmark database file summary function lists")
         self.database.update_file_summary_funcs(self._file_summary_funcs)
-        logging.info("Updating benchmark database file hash list")
-        self.database.update_files(self.client, self.data_locations)
-        if self._tags_csv is not None:
-            logging.info("Updating benchmark database file tags")
-            self.database.update_tags(self._tags_csv)
-        logging.info("Updating benchmark database compression results")
-        self.database.update_compression_results(self.client, self._compressors)
+        # logging.info("Updating benchmark database file hash list")
+        # self.database.update_files(self.client, self.data_locations)
+        # if self._tags_csv is not None:
+        #     logging.info("Updating benchmark database file tags")
+        #     self.database.update_tags(self._tags_csv)
+        # logging.info("Updating benchmark database compression results")
+        # self.database.update_compression_results(self.client, self._compressors)
 
     @staticmethod
     def _load_file(file: InputFile) -> LoadedData | None:
@@ -146,25 +147,44 @@ class Benchmark:
             with open(file.path, "rb") as f:
                 data = f.read()
                 if tiff_check(data):
-                    return LoadedData(data=tiff_decode(data), completed_stages=["tiff_decode"], input_file=file)
+                    return LoadedData(data=tiff_decode(data), input_file=file)
                 else:
-                    return LoadedData(data=np.frombuffer(data), completed_stages=["load_bytes"],
-                                      input_file=file)
+                    return LoadedData(data=np.frombuffer(data), input_file=file)
         except OSError as e:
             logging.exception(f"Error reading {file}: {e}")
 
     @staticmethod
-    def _preprocess_file(preprocessor: Preprocessor, data: LoadedData) -> IntermediateEstimationResult:
-        return IntermediateEstimationResult(preprocessor.instance.run(data.data),
-                                            completed_stages=data.completed_stages + [preprocessor.name],
-                                            input_file=data.input_file, preprocessor=preprocessor)
+    def _preprocess_file(preprocessor: Preprocessor, data: LoadedData) -> PreprocessedData:
+        return PreprocessedData(preprocessor.instance.run(data.data), input_file=data.input_file,
+                                preprocessor=preprocessor)
 
     @staticmethod
-    def _run_estimator(estimator: Estimator, ir: IntermediateEstimationResult) -> EstimationResult | None:
+    def _run_estimator(estimator: Estimator, bsf: BlockSummaryFunc, fsf: FileSummaryFunc,
+                       ppd: PreprocessedData) -> IntermediateEstimationResult | None:
         try:
-            return EstimationResult.from_intermediate_result(ir, estimator.instance.run(ir.data), estimator)
+            return IntermediateEstimationResult.from_preprocessed_data(ppd, estimator.instance.run(ppd.data), estimator,
+                                                                       bsf, fsf)
         except Exception as e:
-            logging.exception(f"Error estimating {ir.input_file}: {e}")
+            logging.exception(f"Error estimating {ppd.input_file}: {e}")
+
+    @staticmethod
+    def _run_block_summary(ier: IntermediateEstimationResult) -> IntermediateEstimationResult | None:
+        try:
+            if ier.block_summary_func is not None:
+                ier.result = ier.block_summary_func.instance(ier.result, **ier.block_summary_func.parameters)
+            return ier
+        except Exception as e:
+            logging.exception(f"Error running {ier.block_summary_func} on {ier.input_file}: {e}")
+
+    @staticmethod
+    def _run_file_summary(ier: IntermediateEstimationResult) -> EstimationResult | None:
+        try:
+            if ier.file_summary_func is not None:
+                return EstimationResult.from_intermediate_result(
+                    ier, value=ier.file_summary_func.instance(ier.result, **ier.file_summary_func.parameters))
+            return EstimationResult.from_intermediate_result(ier, ier.result)
+        except Exception as e:
+            logging.exception(f"Error running {ier.file_summary_func} on {ier.input_file}: {e}")
 
     def run(self):
         start_time = default_timer()
@@ -172,18 +192,30 @@ class Benchmark:
 
         estimation_tasks = self.database.get_missing_estimation_results()
 
-        for batch in itertools.batched(estimation_tasks, 10000):
+        for batch in itertools.batched(estimation_tasks[:100], 1):
             estimation_results = []
-            for file, preprocessor_name, estimator_name in batch:
-                loaded_file = self.client.submit(self._load_file, file)
+            for task in batch:
+                loaded_file = self.client.submit(self._load_file, file=task.input_file)
 
-                preprocessor_instance = next(filter(lambda x: x.name == preprocessor_name, self._preprocessors))
-                preprocessed = self.client.submit(self._preprocess_file, preprocessor=preprocessor_instance,
+                preprocessor = next(filter(lambda x: x.name == task.preprocessor_name, self._preprocessors))
+                preprocessed = self.client.submit(self._preprocess_file, preprocessor=preprocessor,
                                                   data=loaded_file)
 
-                estimator_instance = next(filter(lambda x: x.name == estimator_name, self._estimators))
-                estimation_results.append(
-                    self.client.submit(self._run_estimator, estimator=estimator_instance, ir=preprocessed))
+                estimator = next(filter(lambda x: x.name == task.estimator_name, self._estimators))
+                try:
+                    bsf = next(filter(lambda x: x.name == task.block_summary_func_name, self._block_summary_funcs))
+                except StopIteration:
+                    bsf = None
+                try:
+                    fsf = next(filter(lambda x: x.name == task.file_summary_func_name, self._file_summary_funcs))
+                except StopIteration:
+                    fsf = None
+                estimated = self.client.submit(self._run_estimator, estimator=estimator, bsf=bsf,
+                                               fsf=fsf, ppd=preprocessed)
+
+                # block_summarized = self.client.submit(self._run_block_summary, ier=estimated)
+                #
+                # estimation_results.append(self.client.submit(self._run_file_summary, ier=block_summarized))
 
             for future, result in as_completed(estimation_results, with_results=True):
                 completed_tasks += 1

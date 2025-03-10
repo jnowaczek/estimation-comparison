@@ -26,7 +26,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from dataclasses import dataclass
-from typing import NamedTuple, List, Self, Callable, Optional
+from typing import Self, Callable, Optional
 
 import numpy as np
 
@@ -35,27 +35,9 @@ from estimation_comparison.data_collection.compressor.image import ImageCompress
 from estimation_comparison.data_collection.estimator import EstimatorBase
 from estimation_comparison.data_collection.preprocessor import BaseSampler
 
-InputFile = NamedTuple("InputFile", [("hash", str), ("path", str), ("name", str), ("size_bytes", int)])
 
-Ratio = NamedTuple("Ratio", [("hash", str), ("algorithm", str), ("ratio", float)])
-CompressionResult = NamedTuple("CompressionResult", [("hash", str), ("algorithm", str), ("size_bytes", int)])
-Metric = NamedTuple("Metric", [("hash", str), ("estimator", str), ("metric", bytes)])
-
-FriendlyRatio = NamedTuple("Ratio", [("file_name", str), ("algorithm", str), ("ratio", float)])
-FriendlyMetric = NamedTuple("Metric", [("file_name", str), ("preprocessor", str), ("estimator", str), ("metric", any)])
-
-
-@dataclass
-class EstimationTask:
-    hash: str
-    path: str
-    name: str
-    size_bytes: int
-    preprocessor_name: str
-    estimator_name: str
-    block_summary_func_name: Optional[str]
-    file_summary_func_name: Optional[str]
-
+# Benchmark config classes
+# Also used in database model
 
 @dataclass
 class Estimator:
@@ -91,35 +73,88 @@ class FileSummaryFunc:
     parameters: Optional[dict] = None
 
 
+# Database model classes
+
+@dataclass
+class InputFile:
+    hash: str
+    path: str
+    name: str
+    size_bytes: int
+
+
+@dataclass
+class CompressionTask:
+    input_file: InputFile
+    compressor_name: str
+
+
+@dataclass
+class EstimationTask:
+    input_file: InputFile
+    preprocessor_name: str
+    estimator_name: str
+    block_summary_func_name: Optional[str]
+    file_summary_func_name: Optional[str]
+
+
+# Result model classes
+
 @dataclass
 class LoadedData:
     data: np.ndarray
-    completed_stages: List[str]
     input_file: InputFile
+
+
+@dataclass
+class CompressionResult:
+    input_file: InputFile
+    compressor: Compressor
+    compressed_size_bytes: int
+
+
+@dataclass
+class PreprocessedData:
+    data: np.ndarray
+    input_file: InputFile
+    preprocessor: Preprocessor
+
+    @classmethod
+    def from_loaded_data(cls, ld: LoadedData, preprocessor: Preprocessor) -> Self:
+        return PreprocessedData(data=ld.data, input_file=ld.input_file, preprocessor=preprocessor)
 
 
 @dataclass
 class IntermediateEstimationResult:
-    data: np.ndarray
-    completed_stages: List[str]
+    result: np.ndarray | int | float
     input_file: InputFile
     preprocessor: Preprocessor
+    estimator: Estimator
+    block_summary_func: Optional[BlockSummaryFunc]
+    file_summary_func: Optional[FileSummaryFunc]
+
+    @classmethod
+    def from_preprocessed_data(cls, pd: PreprocessedData, result: np.ndarray, estimator: Estimator,
+                               block_summary_func: BlockSummaryFunc,
+                               file_summary_func: FileSummaryFunc) -> Self:
+        return IntermediateEstimationResult(result=result, input_file=pd.input_file, preprocessor=pd.preprocessor,
+                                            estimator=estimator, block_summary_func=block_summary_func,
+                                            file_summary_func=file_summary_func)
 
 
 @dataclass
 class EstimationResult:
     value: int | float
-    completed_stages: List[str]
     input_file: InputFile
     preprocessor: Preprocessor
     estimator: Estimator
-    block_summary: Optional[BlockSummaryFunc]
-    file_summary: Optional[FileSummaryFunc]
+    block_summary_func: Optional[BlockSummaryFunc]
+    file_summary_func: Optional[FileSummaryFunc]
 
     @classmethod
-    def from_intermediate_result(cls, ir: IntermediateEstimationResult, value: int | float,
-                                 estimator: Estimator) -> Self:
-        return EstimationResult(value=value, completed_stages=ir.completed_stages + [estimator.name],
+    def from_intermediate_result(cls, ir: IntermediateEstimationResult, value: int | float) -> Self:
+        return EstimationResult(value=value,
                                 input_file=ir.input_file,
-                                preprocessor=ir.preprocessor, estimator=estimator, block_summary=None,
-                                file_summary=None)
+                                preprocessor=ir.preprocessor, estimator=ir.estimator,
+                                block_summary_func=ir.block_summary_func,
+                                file_summary_func=ir.file_summary_func)
