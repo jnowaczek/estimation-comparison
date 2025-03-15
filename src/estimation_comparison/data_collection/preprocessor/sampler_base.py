@@ -14,6 +14,7 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from abc import ABC
 
+import numpy as np
 # noinspection PyProtectedMember
 from traitlets import HasTraits
 
@@ -25,6 +26,6 @@ class BaseSampler[T](ABC, HasTraits, metaclass=BaseSamplerMeta):
     def run(self, data: T) -> T:
         pass
 
-class NoopSampler[T](BaseSampler):
-    def run(self, data: T) -> T:
-        return data
+class FlattenSampler(BaseSampler[np.ndarray]):
+    def run(self, data: np.ndarray) -> np.ndarray:
+        return data.flatten()

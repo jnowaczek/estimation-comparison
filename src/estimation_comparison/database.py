@@ -446,8 +446,8 @@ class BenchmarkDatabase:
                 VALUES (?,
                         (SELECT preprocessor_id FROM preprocessors WHERE name = ?),
                         (SELECT estimator_id FROM estimators WHERE name = ?),
-                        (SELECT block_summary_func_id FROM block_summary_funcs WHERE name = ?),
-                        (SELECT file_summary_func_id FROM file_summary_funcs WHERE name = ?),
+                        (SELECT block_summary_id FROM block_summary_funcs WHERE name = ?),
+                        (SELECT file_summary_id FROM file_summary_funcs WHERE name = ?),
                         ?)
                 """,
                 (result.input_file.hash, result.preprocessor.name, result.estimator.name,

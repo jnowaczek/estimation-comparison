@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Self, Callable, Optional
 
 import numpy as np
+import dask.array as da
 
 from estimation_comparison.data_collection.compressor.general import GeneralCompressorBase
 from estimation_comparison.data_collection.compressor.image import ImageCompressorBase

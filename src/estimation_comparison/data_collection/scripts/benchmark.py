@@ -13,6 +13,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import argparse
+import functools
 import itertools
 import logging
 import pathlib
@@ -20,7 +21,7 @@ from pathlib import Path
 from timeit import default_timer
 from typing import List, Optional
 
-import dask.array
+import dask.array as da
 import numpy as np
 from dask.distributed import Client, as_completed
 from imagecodecs import tiff_check, tiff_decode
@@ -28,7 +29,7 @@ from imagecodecs import tiff_check, tiff_decode
 from estimation_comparison.data_collection.compressor.general import *
 from estimation_comparison.data_collection.compressor.image import *
 from estimation_comparison.data_collection.estimator import *
-from estimation_comparison.data_collection.preprocessor import NoopSampler, PatchSampler
+from estimation_comparison.data_collection.preprocessor import FlattenSampler, PatchSampler
 from estimation_comparison.data_collection.preprocessor.linear_sample import LinearSampler
 from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch, autocorrelation_lag, \
     proportion_above_metric_cutoff
@@ -46,7 +47,7 @@ class Benchmark:
         self.database = BenchmarkDatabase(Path(self.output_dir) / "benchmark.sqlite")
 
         self._preprocessors: List[Preprocessor] = [
-            Preprocessor(name="entire_file", instance=NoopSampler()),
+            Preprocessor(name="entire_file", instance=FlattenSampler()),
             Preprocessor(name="patch_random_25%", instance=PatchSampler(fraction=0.25)),
             Preprocessor(name="patch_random_50%", instance=PatchSampler(fraction=0.5)),
             Preprocessor(name="patch_random_75%", instance=PatchSampler(fraction=0.75)),
@@ -135,11 +136,9 @@ class Benchmark:
                 data = f.read()
                 if tiff_check(data):
                     data = tiff_decode(data)
-                    data = np.reshape(data, (-1,))
-                    data = dask.array.from_array(data, chunks=972)
                     return LoadedData(data=data, input_file=file)
                 else:
-                    return LoadedData(data=dask.array.from_array(data, chunks=972), input_file=file)
+                    return LoadedData(data=da.from_array(data, chunks=972), input_file=file)
         except OSError as e:
             logging.exception(f"Error reading {file}: {e}")
 
@@ -161,8 +160,10 @@ class Benchmark:
     def _run_block_summary(ier: IntermediateEstimationResult) -> IntermediateEstimationResult | None:
         try:
             if ier.block_summary_func is not None:
-                ier.result = ier.block_summary_func.instance(ier.result, **(
+                memoized = functools.partial(ier.block_summary_func.instance, **(
                     ier.block_summary_func.parameters if ier.block_summary_func.parameters is not None else {}))
+                print(f"ier {ier.result.shape}")
+                ier.result = da.apply_along_axis(memoized, 0, ier.result)
             return ier
         except Exception as e:
             logging.exception(f"Error running {ier.block_summary_func} on {ier.input_file}: {e}")
@@ -214,7 +215,7 @@ class Benchmark:
                 logging.info(
                     f"{completed_tasks}/{len(estimation_tasks)} estimation tasks complete, {completed_tasks / len(estimation_tasks) * 100:.2f}%")
                 try:
-                    self.database.update_estimation_result(result)
+                    self.database.update_estimation_result(result.value.compute())
                 except Exception as e:
                     logging.exception(f"Input file '{result.input_file.name}' raised exception\n\t{e}")
 

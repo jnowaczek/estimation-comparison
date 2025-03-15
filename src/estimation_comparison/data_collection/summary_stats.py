@@ -15,32 +15,34 @@
 import math
 
 import numpy as np
+import dask.array as da
 
 
-def max_outside_middle_notch(x, notch_width: int):
+def max_outside_middle_notch(x: da.Array, notch_width: int):
     try:
-        return np.max(x[:math.floor((len(x) / 2) - notch_width)])
+        return da.max(x[:math.floor((x.shape[0] / 2) - notch_width)])
     except ValueError:
         return 0.0
 
 
-def proportion_below_lag_cutoff(x, cutoff: int):
-    return np.sum(np.abs(x[:cutoff])) / np.sum(np.abs(x))
+def proportion_below_lag_cutoff(x: da.Array, cutoff: int):
+    return da.sum(da.abs(x[:cutoff])) / da.sum(da.abs(x)).compute()
 
 
-def max_below_cutoff(x, cutoff: int):
+def max_below_cutoff(x: da.Array, cutoff: int):
     try:
-        return np.max(x[:cutoff])
+        return da.max(x[:cutoff]).compute()
     except ValueError:
         return 0.0
 
 
-def autocorrelation_lag(x, lag: int) -> float:
+def autocorrelation_lag(x: da.Array, lag: int) -> float:
     try:
-        return abs(x[len(x) // 2 + lag])
+        print(x.shape)
+        # return da.abs(x[x.shape[0] // 2 + lag]).compute()
     except ValueError:
         return 0.0
 
 
-def proportion_above_metric_cutoff(x, cutoff: float) -> float:
-    return len(np.asarray(np.abs(x) > cutoff).nonzero()[0]) / len(x)
+def proportion_above_metric_cutoff(x: da.Array, cutoff: float) -> float:
+    return len(da.asarray(da.abs(x) > cutoff).nonzero()[0]) / x.shape[0].compute()
