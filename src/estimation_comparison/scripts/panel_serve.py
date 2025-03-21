@@ -14,10 +14,10 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import panel as pn
 
-from estimation_comparison.analysis import tags_panel
+from estimation_comparison.analysis import tags_panel, explore_panel
 
 def main():
-    pn.serve(graph_panel)
+    pn.serve({"tags_panel": tags_panel, "explore_panel": explore_panel}, admin=True, location=True)
 
 if __name__ == '__main__':
     main()

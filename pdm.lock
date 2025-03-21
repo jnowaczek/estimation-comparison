@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:0272740e4a8aed7b570606d50fe61a18676ffc4c78e6c3c6188ea3dc1cf90846"
+content_hash = "sha256:e8af772a59bc9f7ad4b3d239cc2d087e71804aad5cd76b77e8efccf59e722c7b"
 
 [[metadata.targets]]
 requires_python = ">=3.12"
@@ -1417,6 +1417,17 @@ groups = ["default"]
 files = [
     {file = "Wand-0.6.13-py2.py3-none-any.whl", hash = "sha256:e5dda0ac2204a40c29ef5c4cb310770c95d3d05c37b1379e69c94ea79d7d19c0"},
     {file = "Wand-0.6.13.tar.gz", hash = "sha256:f5013484eaf7a20eb22d1821aaefe60b50cc329722372b5f8565d46d4aaafcca"},
+]
+
+[[package]]
+name = "wat"
+version = "0.6.0"
+requires_python = ">=3.8"
+summary = "Deep inspection of Python objects"
+groups = ["dev"]
+files = [
+    {file = "wat-0.6.0-py3-none-any.whl", hash = "sha256:53b3d6aeffe87f3691ad4a0a333e861ea4f997401ef0de8ea892062733f9ae3d"},
+    {file = "wat-0.6.0.tar.gz", hash = "sha256:ba25374e243f2ebd53ed577b9bc5f08b914ff103e4f8030bd4b6e3625888788b"},
 ]
 
 [[package]]

@@ -12,8 +12,6 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import dask
-import dask.array as da
 import numpy as np
 import scipy.signal as signal
 # noinspection PyProtectedMember
@@ -25,27 +23,17 @@ from estimation_comparison.data_collection.estimator.base import EstimatorBase
 class Autocorrelation(EstimatorBase):
     block_size = Int(1024)
 
-    def estimate(self, data: np.ndarray) -> da.Array:
-        def subtract_mean(block: da.Array) -> da.Array:
-            return da.subtract(block, da.mean(block))
-
+    def estimate(self, data: np.ndarray) -> np.ndarray:
         def autocorrelate(block):
-            print(block)
-            a =  signal.correlate(block, block)
-            print(a)
-            return a
+            return signal.correlate(block, block)
 
         trimmed_data = data[:data.shape[0] // self.block_size * self.block_size]
 
         data_mean = np.mean(trimmed_data)
         data_std_dev_sqrd = np.std(trimmed_data) ** 2
 
-        data_array = da.from_array(trimmed_data, self.block_size)
-        data_array = da.reshape(data_array, (-1, self.block_size))
+        data_array = np.reshape(trimmed_data, (-1, self.block_size))
 
-        data_zero_mean = da.subtract(data_array, data_mean)
-        correlation = dask.delayed(da.apply_along_axis(np.correlate, 1, arr=data_zero_mean, v=data_zero_mean))
-        print(f"dm: {data_mean}, dzm: {data_zero_mean.shape}, num: {correlation.shape}, denom: {data_std_dev_sqrd}")
-        a = da.divide(correlation, data_std_dev_sqrd)
-        print(f"ayto {data.shape}, {data_array.shape}, {a.shape}, {data_zero_mean.shape}")
-        return a
+        data_array = np.subtract(data_array, data_mean)  # Zero mean
+        correlation = np.apply_along_axis(autocorrelate, 1, data_array)
+        return np.divide(correlation, data_std_dev_sqrd)

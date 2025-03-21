@@ -73,7 +73,7 @@ class Benchmark:
 
         self._block_summary_funcs += [BlockSummaryFunc(name=f"proportion_above_metric_cutoff_{x / 100}",
                                                        instance=proportion_above_metric_cutoff,
-                                                       parameters={"cutoff": {x / 100}}
+                                                       parameters={"cutoff": x / 100}
                                                        ) for x in range(5, 100, 5)]
 
         self._file_summary_funcs: List[FileSummaryFunc] = [
@@ -121,13 +121,13 @@ class Benchmark:
         self.database.update_block_summary_funcs(self._block_summary_funcs)
         logging.info("Updating benchmark database file summary function lists")
         self.database.update_file_summary_funcs(self._file_summary_funcs)
-        # logging.info("Updating benchmark database file hash list")
-        # self.database.update_files(self.client, self.data_locations)
-        # if self._tags_csv is not None:
-        #     logging.info("Updating benchmark database file tags")
-        #     self.database.update_tags(self._tags_csv)
-        # logging.info("Updating benchmark database compression results")
-        # self.database.update_compression_results(self.client, self._compressors)
+        logging.info("Updating benchmark database file hash list")
+        self.database.update_files(self.client, self.data_locations)
+        if self._tags_csv is not None:
+            logging.info("Updating benchmark database file tags")
+            self.database.update_tags(self._tags_csv)
+        logging.info("Updating benchmark database compression results")
+        self.database.update_compression_results(self.client, self._compressors)
 
     @staticmethod
     def _load_file(file: InputFile) -> LoadedData | None:
@@ -162,8 +162,7 @@ class Benchmark:
             if ier.block_summary_func is not None:
                 memoized = functools.partial(ier.block_summary_func.instance, **(
                     ier.block_summary_func.parameters if ier.block_summary_func.parameters is not None else {}))
-                print(f"ier {ier.result.shape}")
-                ier.result = da.apply_along_axis(memoized, 0, ier.result)
+                ier.result = np.apply_along_axis(memoized, 1, ier.result)
             return ier
         except Exception as e:
             logging.exception(f"Error running {ier.block_summary_func} on {ier.input_file}: {e}")
@@ -185,7 +184,7 @@ class Benchmark:
 
         estimation_tasks = self.database.get_missing_estimation_results()
 
-        for batch in itertools.batched(estimation_tasks[:10], 10):
+        for batch in itertools.batched(estimation_tasks, 10000):
             estimation_results = []
             for task in batch:
                 loaded_file = self.client.submit(self._load_file, file=task.input_file)
@@ -215,7 +214,7 @@ class Benchmark:
                 logging.info(
                     f"{completed_tasks}/{len(estimation_tasks)} estimation tasks complete, {completed_tasks / len(estimation_tasks) * 100:.2f}%")
                 try:
-                    self.database.update_estimation_result(result.value.compute())
+                    self.database.update_estimation_result(result)
                 except Exception as e:
                     logging.exception(f"Input file '{result.input_file.name}' raised exception\n\t{e}")
 

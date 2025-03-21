@@ -11,7 +11,8 @@
 #  GNU General Public License for more details.
 #
 #  You should have received a copy of the GNU General Public License
-#  along with this program.  If not, see <https://www.gnu.org/licenses/>.\nfrom imagecodecs import tiff_decode, jpeg2k_encode, tiff_check
+#  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+from imagecodecs import tiff_decode, jpeg2k_encode, tiff_check
 # noinspection PyProtectedMember
 from traitlets import Bool, validate, Int
 
