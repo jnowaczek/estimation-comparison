@@ -15,6 +15,7 @@
 import argparse
 import csv
 import logging
+import os
 import random
 from concurrent import futures
 from concurrent.futures import ProcessPoolExecutor
@@ -31,9 +32,10 @@ RAISE_HASHES = [RAISE_1K_SHA256, RAISE_ALL_SHA256]
 
 
 class RaiseDownloader:
-    def __init__(self, csv_path: Path, skip_hash_check: bool, output_dir: Path):
+    def __init__(self, csv_path: Path, skip_hash_check: bool, skip_downloaded: bool, output_dir: Path):
         self.path = csv_path
         self.force_download = skip_hash_check
+        self.skip_downloaded = skip_downloaded
         self.output_dir = output_dir
         self.filelist = None
 
@@ -63,6 +65,10 @@ class RaiseDownloader:
             tasks = []
 
             for file in self.filelist:
+                if self.skip_downloaded:
+                    os.path.exists(self.output_dir / file["File"])
+                    continue
+
                 tasks.append(executor.submit(self._get_and_magick_file, file["TIFF"], self.output_dir / file["File"]))
 
             for _ in futures.as_completed(tasks):
@@ -89,13 +95,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true")
     parser.add_argument("-s", "--skip-hash-check", dest="skip_hash_check", action="store_true", default=False)
+    parser.add_argument("--skip-downloaded", dest="skip_downloaded", action="store_true", default=False)
     parser.add_argument(type=Path, dest="csv_path")
     parser.add_argument(type=Path, dest="output_dir")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
 
-    d = RaiseDownloader(args.csv_path, args.skip_hash_check, args.output_dir)
+    d = RaiseDownloader(args.csv_path, args.skip_hash_check, args.skip_downloaded, args.output_dir)
 
     d.run()
 
