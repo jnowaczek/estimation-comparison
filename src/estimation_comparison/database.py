@@ -508,10 +508,44 @@ class BenchmarkDatabase:
     def get_combinations(self) -> List[Tuple[str, str, str]]:
         return self.con.execute(
             """
-            SELECT p.name, e.name, c.name
-            FROM preprocessors p
-                     CROSS JOIN estimators e
-                     CROSS JOIN compressors c
+            WITH block_summary_func_without_none as (SELECT * FROM block_summary_funcs WHERE name != 'none'),
+                 file_summary_func_without_none as (SELECT * FROM file_summary_funcs WHERE name != 'none'),
+                 estimators_without_summary_func as (SELECT estimator_id, name AS est_name
+                                                     FROM estimators
+                                                     WHERE summarize_block = FALSE
+                                                       AND summarize_file = FALSE),
+                 estimators_with_file_summary_func AS (SELECT estimator_id, name AS est_name
+                                                       FROM estimators
+                                                       WHERE summarize_block = FALSE
+                                                         AND summarize_file = TRUE),
+                 estimators_with_block_summary_func AS (SELECT estimator_id, name AS est_name
+                                                        FROM estimators
+                                                        WHERE summarize_block = TRUE
+                                                          AND summarize_file = TRUE),
+                 file_summary_permutations AS (SELECT estimator_id, est_name, fsf.name AS fsf_name
+                                               FROM estimators_with_file_summary_func
+                                                        CROSS JOIN file_summary_func_without_none fsf),
+                 block_summary_permutations AS (SELECT estimator_id, est_name, bsf.name AS bsf_name, fsf.name AS fsf_name
+                                                FROM estimators_with_block_summary_func
+                                                         CROSS JOIN block_summary_func_without_none bsf
+                                                         CROSS JOIN file_summary_func_without_none fsf),
+                 estimator_permutations AS (SELECT estimator_id,
+                                                   est_name,
+                                                   'none' AS bsf_name,
+                                                   'none' AS fsf_name
+                                            FROM estimators_without_summary_func
+                                            UNION
+                                            SELECT estimator_id, est_name, 'none' AS bsf_name, fsf_name
+                                            FROM file_summary_permutations
+                                            UNION
+                                            SELECT estimator_id, est_name, bsf_name, fsf_name
+                                            FROM block_summary_permutations)
+            SELECT preprocessors.name,
+                   ep.est_name,
+                   ep.bsf_name,
+                   ep.fsf_name
+            FROM estimator_permutations ep
+                    CROSS JOIN preprocessors
             """).fetchall()
 
     def get_all_estimations_dataframe(self):
