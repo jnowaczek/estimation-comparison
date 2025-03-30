@@ -28,6 +28,7 @@ from imagecodecs import tiff_check, tiff_decode
 
 from estimation_comparison.data_collection.compressor.general import *
 from estimation_comparison.data_collection.compressor.image import *
+from estimation_comparison.data_collection.compressor.image.webp import WebPCompressor
 from estimation_comparison.data_collection.estimator import *
 from estimation_comparison.data_collection.preprocessor import FlattenSampler, PatchSampler
 from estimation_comparison.data_collection.preprocessor.linear_sample import LinearSampler
@@ -105,6 +106,8 @@ class Benchmark:
             Compressor(name="png", instance=PngCompressor()),
             Compressor(name="bzip2_9", instance=Bzip2Compressor(level=9)),
             Compressor(name="zstd", instance=ZstandardCompressor()),
+            Compressor(name="webp", instance=WebPCompressor()),
+            Compressor(name="webp_lossless", instance=WebPCompressor(lossless=True)),
         ]
 
         self.client = Client()
