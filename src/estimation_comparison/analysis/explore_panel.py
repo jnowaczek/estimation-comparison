@@ -18,22 +18,14 @@ import colorcet as cc
 import pandas as pd
 import panel as pn
 import param
-from bokeh.models import ColumnDataSource, Band
+from bokeh.models import ColumnDataSource, Band, Range1d
 from bokeh.plotting import figure
-from param import Parameterized
 
 from estimation_comparison.analysis.fit import quadratic_fit, linear_fit
+from estimation_comparison.analysis.panel_model import Series
 from estimation_comparison.database import BenchmarkDatabase
 
 db = BenchmarkDatabase(Path("benchmarks/benchmark.sqlite"))
-
-
-class Series(Parameterized):
-    preprocessor = param.String()
-    estimator = param.String()
-    compressor = param.String()
-    lin_fit_show = param.Boolean()
-    quad_fit_show = param.Boolean()
 
 
 class SeriesPlots(pn.viewable.Viewer):
@@ -59,21 +51,26 @@ class SeriesInput(pn.viewable.Viewer):
         pre_select = pn.widgets.Select(name="Preprocessor", options=[entry[1] for entry in db.get_preprocessors()])
         est_select = pn.widgets.Select(name="Estimator", options=[entry[1] for entry in db.get_estimators()])
         comp_select = pn.widgets.Select(name="Compressor", options=[entry[1] for entry in db.get_compressors()])
+        block_select = pn.widgets.Select(name="Block Summary",
+                                         options=[entry[1] for entry in db.get_block_summary_funcs()] + ["None"])
+        file_select = pn.widgets.Select(name="File Summary",
+                                        options=[entry[1] for entry in db.get_file_summary_funcs()] + ["None"])
 
         lin_fit_show = pn.widgets.Checkbox(name="Show linear fit", value=False)
         quad_fit_show = pn.widgets.Checkbox(name="Show quadratic fit", value=False)
 
         add_button = pn.widgets.Button(name="Add", button_type="primary", align="center")
-        plot_controls = pn.layout.WidgetBox("## Configure series", pre_select, est_select, comp_select, lin_fit_show,
-                                            quad_fit_show,
-                                            add_button)
+        plot_controls = pn.layout.WidgetBox("## Configure series", pre_select, est_select, comp_select, block_select,
+                                            file_select, lin_fit_show, quad_fit_show, add_button)
 
-        @pn.depends(pre_select, est_select, comp_select, lin_fit_show, quad_fit_show, add_button, watch=True)
-        def create_series(pre_select, est_select, comp_select, lin_fit_show, quad_fit_show, add_button):
+        @pn.depends(pre_select, est_select, comp_select, block_select, file_select, lin_fit_show, quad_fit_show,
+                    add_button, watch=True)
+        def create_series(pre_select, est_select, comp_select, block_select, file_select, lin_fit_show, quad_fit_show,
+                          add_button):
             if add_button:
                 self.value = Series(preprocessor=pre_select, estimator=est_select,
-                                    compressor=comp_select, lin_fit_show=lin_fit_show,
-                                    quad_fit_show=quad_fit_show)
+                                    compressor=comp_select, block_summary_fn=block_select, file_summary_fn=file_select,
+                                    lin_fit_show=lin_fit_show, quad_fit_show=quad_fit_show)
 
         return plot_controls
 
@@ -88,11 +85,12 @@ class PlotEditor(pn.viewable.Viewer):
 
     @staticmethod
     def _plot(series):
-        fig = figure(x_range=(0, 100))
+        fig = figure(x_range=Range1d(0, 100))
         fig.sizing_mode = "scale_both"
 
         for index, s in enumerate(series):
-            desc, rec = db.get_solo_plot_dataframe(s.preprocessor, s.estimator, s.compressor)
+            desc, rec = db.get_solo_plot_dataframe(s.preprocessor, s.estimator, s.compressor, s.block_summary_fn,
+                                                   s.file_summary_fn)
 
             data = pd.DataFrame.from_records(rec, columns=[item[0] for item in desc])
 
@@ -158,12 +156,5 @@ template.main.append(plot_editor)
 home_button = pn.widgets.Button(name="Index", button_type="primary")
 home_button.js_on_click(code="window.location.href='/panel/'")
 template.header.append(home_button)
-
-# bokeh_pane = pn.bind(plot, series_list.param.ls)
-
-# template.main.append(bokeh_pane)
-
-# table = pn.widgets.Tabulator(data)
-# template.main.append(table)
 
 template.servable()

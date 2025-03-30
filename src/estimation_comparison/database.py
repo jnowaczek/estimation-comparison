@@ -140,8 +140,11 @@ class BenchmarkDatabase:
                 name             TEXT                              NOT NULL UNIQUE,
                 parameters       BLOB
             )
+            """)
+        self.con.execute(
             """
-        )
+            INSERT OR IGNORE INTO block_summary_funcs (block_summary_id, name) VALUES (1, 'none')
+            """)
         self.con.commit()
         self.con.execute(
             """
@@ -151,8 +154,11 @@ class BenchmarkDatabase:
                 name            TEXT                              NOT NULL UNIQUE,
                 parameters      BLOB
             )
+            """)
+        self.con.execute(
             """
-        )
+            INSERT OR IGNORE INTO file_summary_funcs (file_summary_id, name) VALUES (1, 'none')
+            """)
         self.con.commit()
 
     def update_estimators(self, estimators: List[Estimator]):
@@ -549,7 +555,8 @@ class BenchmarkDatabase:
             """, (tag, preprocessor, estimator, compressor))
         return cursor.description, cursor.fetchall()
 
-    def get_solo_plot_dataframe(self, preprocessor: str, estimator: str, compressor: str):
+    def get_solo_plot_dataframe(self, preprocessor: str, estimator: str, compressor: str, block_summary_fn: str,
+                                file_summary_fn: str):
         cursor = self.con.execute(
             """
                 SELECT fe.file_hash,
@@ -563,8 +570,10 @@ class BenchmarkDatabase:
                   AND fe.preprocessor_id = (SELECT preprocessor_id FROM preprocessors WHERE name = ?)
                   AND fe.estimator_id = (SELECT estimator_id FROM estimators WHERE name = ?)
                   AND cr.compressor_id = (SELECT compressor_id FROM compressors WHERE name = ?)
+                  AND fe.block_summary_func_id = (SELECT block_summary_id FROM block_summary_funcs WHERE name = ?)
+                  AND fe.file_summary_func_id = (SELECT file_summary_id FROM file_summary_funcs WHERE name = ?)
                 ORDER BY name
-                """, (preprocessor, estimator, compressor))
+                """, (preprocessor, estimator, compressor, block_summary_fn, file_summary_fn))
         return cursor.description, cursor.fetchall()
 
     @staticmethod
