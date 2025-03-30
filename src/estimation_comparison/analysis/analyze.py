@@ -68,16 +68,7 @@ class Analyze:
         # self._create_dataframes()
         self.plot_handler = PlotHandler(self.data)
 
-    def run_explore(self):
-        print(self.data.columns)
-        print(self.data.dtypes)
-        print(type(self.data["filename"][0]))
-        # Passing opts to the explorer either takes forever with lots of graphs or doesn't work, set default instead
-        # opts.defaults(opts.Scatter(hover_tooltips=["test"]))
-        hve = self.data.hvplot.explorer()
-        hve.show()
-
-    def run_fit(self):
+    def run(self):
         combinations = self.data[["preprocessor", "estimator", "compressor"]].drop_duplicates()
         fit_lines = pd.DataFrame(
             columns=["preprocessor", "estimator", "compressor", "linear_fit", "linear_lower_confidence",
@@ -133,56 +124,6 @@ class Analyze:
                 show(f)
                 input("Press Enter to continue...")
 
-    def run_tag_plots(self):
-        for combination in self.database.get_combinations():
-            description, records = self.database.get_solo_tag_plot_dataframe(*combination, tag="outdoor")
-            data = pd.DataFrame().from_records(records, columns=[item[0] for item in description])
-            print(data.head())
-
-    def run(self):
-        plots = {}
-
-        self.data.hvplot(
-            by=['estimator'],
-            groupby=['preprocessor', 'compressor'],
-            kind='scatter',
-            x='ratio',
-            y=['metric'],
-            legend='bottom_right',
-            widget_location='bottom',
-        )
-
-        # for compressor in self.data["compressor"].unique():
-        #     for estimator in self.data["estimator"].unique():
-        #         plots[(compressor, estimator)] = self.plot_handler.ratio_plot(compressor, estimator)
-
-        # p = self.data.hvplot(
-        #     by=['estimator'],
-        #     groupby=['compressor'],
-        #     height=1000,
-        #     kind='scatter',
-        #     logx=True,
-        #     logy=True,
-        #     x='ratio',
-        #     y=['metric'],
-        #     legend='bottom_right',
-        #     widget_location='bottom',
-        #     # hover_tooltips=[("Filename", "@filename")],
-        #     use_index=True,
-        # )
-        # p.show()
-
-        # for algorithm in filter(lambda x: "Parameters" not in x, self.data.columns):
-        #     print(f"{algorithm}: {self.data[algorithm].corr(self.data['jxl'])}")
-
-        save_time = datetime.now().isoformat(timespec="seconds")
-        for name, p in plots.items():
-            if p is not None:
-                filename = f"{self.output_dir}/plot_{save_time}_{name}.html"
-                save(p, filename, resources="cdn", title=name)
-                if args.open_in_browser:
-                    webbrowser.open_new_tab(filename)
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -209,4 +150,4 @@ if __name__ == "__main__":
     else:
         analyze.load(args.input_dir / "benchmark.sqlite")
 
-    analyze.run_tag_plots()
+    analyze.run()
