@@ -14,140 +14,87 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import argparse
 import logging
-import webbrowser
-from concurrent.futures import ProcessPoolExecutor
-from datetime import datetime
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from timeit import default_timer
+from typing import List
 
 import pandas as pd
-from bokeh.io import save
-from bokeh.models import Band, ColumnDataSource
-from bokeh.plotting import figure, show
+import sklearn
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import cross_val_score
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import PolynomialFeatures
 
-from estimation_comparison.analysis.fit import linear_fit, quadratic_fit
-from estimation_comparison.analysis.plot import PlotHandler
 from estimation_comparison.database import BenchmarkDatabase
 
 
+@dataclass
+class Fit:
+    preprocessor_name: str
+    estimator_name: str
+    block_summary_func_name: str
+    file_summary_func_name: str
+    compressor_name: str
+    scores: any
+
+    def __lt__(self, other):
+        return self.scores.mean() < other.scores.mean()
+
+
 class Analyze:
-    def __init__(self, output_dir: str, workers: int | None, parallel=False):
-        self.database: Optional[BenchmarkDatabase] = None
-        self.data: pd.DataFrame | None = None
+    def __init__(self, input_dir: str, output_dir: str):
+        self._init_time = default_timer()
+        self.input_dir = input_dir
         self.output_dir = output_dir
-        self.workers = workers
-        self.plot_handler = None
-
-        if parallel:
-            self.process_pool = ProcessPoolExecutor(max_workers=workers)
-        else:
-            self.process_pool = None
-
-    def _create_dataframes(self):
-        # self.ratios = pd.DataFrame().from_records(self.database.get_all_ratios(),
-        #                                           columns=["filename", "compressor", "ratio"])
-        # self.metrics = pd.DataFrame().from_records(self.database.get_all_metric(),
-        #                                            columns=["filename", "estimator", "metric"])
-        description, records = self.database.get_all_estimations_dataframe()
-
-        self.data = pd.DataFrame().from_records(records, columns=[item[0] for item in description])
-        self.data["percent_size_reduction"] = (1.0 - (
-                self.data["compressed_size_bytes"] / self.data["uncompressed_size_bytes"])) * 100.0
-        logging.info(f"Loaded {self.data.shape} dataframe")
-
-    def load(self, filename: Path):
-        suffix = filename.suffix
-        match suffix:
-            case ".pkl":
-                raise ValueError(f"Pickle files not supported in this version: {suffix}")
-            case ".sqlite":
-                self.database = BenchmarkDatabase(filename)
-            case _:
-                raise ValueError(f"Unsupported file type: {suffix}")
-        logging.info(f"Loaded '{filename}'")
-        # self._create_dataframes()
-        self.plot_handler = PlotHandler(self.data)
+        self.database = BenchmarkDatabase(Path(self.input_dir) / "benchmark.sqlite")
 
     def run(self):
-        combinations = self.data[["preprocessor", "estimator", "compressor"]].drop_duplicates()
-        fit_lines = pd.DataFrame(
-            columns=["preprocessor", "estimator", "compressor", "linear_fit", "linear_lower_confidence",
-                     "linear_upper_confidence", "quadratic_fit", "quadratic_lower_confidence",
-                     "quadratic_upper_confidence"])
+        linear_results: List[Fit] = []
+        quad_results = []
 
-        for row in combinations.itertuples(name="Combination"):
-            data_subset = self.data.loc[(self.data.estimator == row.estimator) &
-                                        (self.data.preprocessor == row.preprocessor) &
-                                        (self.data.compressor == row.compressor)]
-            data_subset = data_subset.sort_values("percent_size_reduction")
+        combinations = self.database.get_combinations()
+        compressor_names = [c[1] for c in self.database.get_compressors()]
 
-            if not data_subset.empty:
-                x = data_subset.percent_size_reduction.tolist()
-                y = data_subset.metric.tolist()
+        linear_pipeline = make_pipeline(LinearRegression())
+        quad_pipeline = make_pipeline(PolynomialFeatures(2), LinearRegression())
 
-                linear = linear_fit(x, y)
-                linear_conf = linear.eval_uncertainty(x=data_subset.percent_size_reduction, sigma=2)
+        for (preprocessor_name, estimator_name, block_summary_func_name, file_summary_func_name) in combinations:
+            for compressor_name in compressor_names:
+                desc, rec = self.database.get_solo_plot_dataframe(preprocessor_name, estimator_name, compressor_name,
+                                                                  block_summary_func_name, file_summary_func_name)
+                data = pd.DataFrame.from_records(rec, columns=[item[0] for item in desc])
+                data["percent_size_reduction"] = (1.0 - (data["final_size"] / data["initial_size"])) * 100.0
 
-                quadratic = quadratic_fit(x, y)
-                quad_conf = quadratic.eval_uncertainty(x=data_subset.percent_size_reduction, sigma=2)
+                kfold = sklearn.model_selection.KFold(n_splits=10, shuffle=True, random_state=1337)
+                linar_scores = cross_val_score(linear_pipeline, data[["metric"]], data["percent_size_reduction"], cv=kfold)
+                quad_scores = cross_val_score(quad_pipeline, data[["metric"]], data["percent_size_reduction"], cv=kfold)
+                linear_results.append(
+                    Fit(preprocessor_name, estimator_name, block_summary_func_name, file_summary_func_name,
+                        compressor_name, linar_scores))
+                quad_results.append(
+                    Fit(preprocessor_name, estimator_name, block_summary_func_name, file_summary_func_name,
+                        compressor_name, quad_scores))
 
-                fit_lines[-1] = [row.preprocessor, row.estimator, row.compressor, linear.best_fit,
-                                 linear.best_fit - linear_conf, linear.best_fit + linear_conf,
-                                 quadratic.best_fit,
-                                 quadratic.best_fit - quad_conf, quadratic.best_fit + quad_conf]
+        print("=== Linear Fit ===")
+        for x in (sorted(linear_results)):
+            print(x)
 
-                f = figure(y_range=(0, 10), title=f"{row.estimator} - {row.preprocessor} - {row.compressor}",
-                           x_range=(0, 100))
-
-                source = ColumnDataSource(data_subset)
-
-                f.scatter(x="percent_size_reduction", y="metric", source=source, alpha=0.2)
-
-                f.line(x="percent_size_reduction", y="linear_fit", color="green", legend_label="Linear fit",
-                       source=source)
-                linear_band = Band(base="percent_size_reduction", lower="linear_conf_lower",
-                                   upper="linear_conf_upper", source=source, fill_color="green", fill_alpha=0.5)
-                f.add_layout(linear_band)
-
-                f.line(x="percent_size_reduction", y="quad_fit", color="red", legend_label="Quadratic fit",
-                       source=source)
-                quad_band = Band(base="percent_size_reduction", lower="quad_conf_lower", upper="quad_conf_upper",
-                                 source=source, fill_color="red", fill_alpha=0.5)
-                f.add_layout(quad_band)
-
-                # f.line(x="percent_size_reduction", y="exp_fit", color="yellow", legend_label="Exponential fit",
-                #        source=source)
-                # exp_band = Band(base="percent_size_reduction", lower="exp_conf_lower", upper="exp_conf_upper",
-                #                  source=source, fill_color="yellow", fill_alpha=0.5)
-                # f.add_layout(exp_band)
-
-                show(f)
-                input("Press Enter to continue...")
-
+        print("=== Quadratic Fit ===")
+        for x in (sorted(quad_results)):
+            print(x)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true")
     parser.add_argument("-i", "--input_dir", type=Path, dest="input_dir", default="./benchmarks",
                         help="directory to load benchmark data from")
-    parser.add_argument("-f", "--file", type=Path, help="path to input file to analyze")
-    parser.add_argument("-p", "--parallel", dest="parallel", action="store_true",
-                        help="enable parallelized plot generation")
-    parser.add_argument("-w", "--workers", type=int, dest="workers", default=None,
-                        help="number of parallel workers, defaults to number of cores")
-    parser.add_argument("-o", "--output_dir", type=Path, dest="output_dir", default="./output",
-                        help="plot output directory")
-    parser.add_argument("-b", "--browser", dest="open_in_browser", action="store_true",
-                        help="open plots in default browser after rendering")
+    parser.add_argument("-o", "--output_dir", type=Path, dest="output_dir", default="./analysis",
+                        help="analysis output directory")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
 
-    analyze = Analyze(args.output_dir, workers=args.workers, parallel=args.parallel)
-
-    if args.file is not None:
-        analyze.load(args.file)
-    else:
-        analyze.load(args.input_dir / "benchmark.sqlite")
+    analyze = Analyze(args.input_dir, args.output_dir)
 
     analyze.run()

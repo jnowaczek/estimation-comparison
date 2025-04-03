@@ -27,4 +27,4 @@ class WebPCompressor(ImageCompressorBase):
             raise ValueError("Input must be tiff")
 
         nda = tiff_decode(data)
-        return webp_encode(nda)
+        return webp_encode(nda, lossless=self.lossless)
