@@ -301,7 +301,7 @@ class BenchmarkDatabase:
             self.con.execute(
                 """INSERT INTO compression_results
                        VALUES (:hash, (SELECT compressor_id FROM compressors WHERE name = :compressor_name), :size_bytes)
-                       """, (new_result.input_file.hash, new_result.compressor.name, new_result.input_file.size_bytes))
+                       """, (new_result.input_file.hash, new_result.compressor.name, new_result.compressed_size_bytes))
             self.con.commit()
         except sqlite3.Error as e:
             logging.exception(e)
