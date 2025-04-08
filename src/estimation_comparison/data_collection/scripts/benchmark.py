@@ -49,12 +49,12 @@ class Benchmark:
 
         self._preprocessors: List[Preprocessor] = [
             Preprocessor(name="entire_file", instance=FlattenSampler()),
-            Preprocessor(name="patch_random_25%", instance=PatchSampler(fraction=0.25)),
-            Preprocessor(name="patch_random_50%", instance=PatchSampler(fraction=0.5)),
-            Preprocessor(name="patch_random_75%", instance=PatchSampler(fraction=0.75)),
-            Preprocessor(name="linear_random_25%", instance=LinearSampler(fraction=0.25)),
-            Preprocessor(name="linear_random_50%", instance=LinearSampler(fraction=0.5)),
-            Preprocessor(name="linear_random_75%", instance=LinearSampler(fraction=0.75)),
+            Preprocessor(name="patch_random_25%", instance=PatchSampler(fraction=0.25, patch_dim=24)),
+            Preprocessor(name="patch_random_50%", instance=PatchSampler(fraction=0.5, patch_dim=24)),
+            Preprocessor(name="patch_random_75%", instance=PatchSampler(fraction=0.75, patch_dim=24)),
+            Preprocessor(name="linear_random_25%", instance=LinearSampler(fraction=0.25, patch_dim=24)),
+            Preprocessor(name="linear_random_50%", instance=LinearSampler(fraction=0.5, patch_dim=24)),
+            Preprocessor(name="linear_random_75%", instance=LinearSampler(fraction=0.75, patch_dim=24)),
         ]
 
         self._block_summary_funcs: List[BlockSummaryFunc] = [
@@ -85,15 +85,14 @@ class Benchmark:
 
         self._estimators: List[Estimator] = [
             Estimator(
-                name="autocorrelation_972",
+                name="autocorrelation_1728",
                 instance=Autocorrelation(
-                    block_size=972
+                    block_size=1728
                 ),
                 summarize_block=True,
-                summarize_file=True
-            ),
-            Estimator(name="bytecount_file", instance=ByteCount()),
-            Estimator(name="entropy_bits", instance=Entropy()),
+                summarize_file=True            ),
+            # Estimator(name="bytecount_file", instance=ByteCount()),
+            # Estimator(name="entropy_bits", instance=Entropy()),
         ]
 
         self._compressors: List[Compressor] = [
