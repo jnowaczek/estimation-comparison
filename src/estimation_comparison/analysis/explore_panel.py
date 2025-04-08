@@ -52,9 +52,9 @@ class SeriesInput(pn.viewable.Viewer):
         est_select = pn.widgets.Select(name="Estimator", options=[entry[1] for entry in db.get_estimators()])
         comp_select = pn.widgets.Select(name="Compressor", options=[entry[1] for entry in db.get_compressors()])
         block_select = pn.widgets.Select(name="Block Summary",
-                                         options=[entry[1] for entry in db.get_block_summary_funcs()] + ["None"])
+                                         options=[entry[1] for entry in db.get_block_summary_funcs()])
         file_select = pn.widgets.Select(name="File Summary",
-                                        options=[entry[1] for entry in db.get_file_summary_funcs()] + ["None"])
+                                        options=[entry[1] for entry in db.get_file_summary_funcs()])
 
         lin_fit_show = pn.widgets.Checkbox(name="Show linear fit", value=False)
         quad_fit_show = pn.widgets.Checkbox(name="Show quadratic fit", value=False)
