@@ -612,6 +612,29 @@ class BenchmarkDatabase:
                 """, (preprocessor, estimator, compressor, block_summary_fn, file_summary_fn))
         return cursor.description, cursor.fetchall()
 
+    def get_solo_tag_plot_dataframe_with_tags(self, preprocessor: str, estimator: str, compressor: str, block_summary_fn: str,
+                                file_summary_fn: str):
+        cursor = self.con.execute(
+            """
+                SELECT fe.file_hash,
+                       fe.metric,
+                       f.size_bytes as initial_size,
+                       cr.size_bytes as final_size,
+                       GROUP_CONCAT(DISTINCT (SELECT tag_name FROM tag_types where ft.tag_id = tag_types.tag_id)) as tags
+                FROM file_estimations fe
+                         INNER JOIN files f ON f.file_hash = fe.file_hash
+                         INNER JOIN compression_results cr ON cr.file_hash = fe.file_hash
+                         LEFT JOIN file_tags ft ON f.file_hash = ft.file_hash
+                WHERE metric IS NOT NULL
+                  AND fe.preprocessor_id = (SELECT preprocessor_id FROM preprocessors WHERE name = ?)
+                  AND fe.estimator_id = (SELECT estimator_id FROM estimators WHERE name = ?)
+                  AND cr.compressor_id = (SELECT compressor_id FROM compressors WHERE name = ?)
+                  AND fe.block_summary_func_id = (SELECT block_summary_id FROM block_summary_funcs WHERE name = ?)
+                  AND fe.file_summary_func_id = (SELECT file_summary_id FROM file_summary_funcs WHERE name = ?)
+                GROUP BY fe.file_hash
+                """, (preprocessor, estimator, compressor, block_summary_fn, file_summary_fn))
+        return cursor.description, cursor.fetchall()
+
     @staticmethod
     def _hash_file(p: Path) -> Optional[str]:
         try:
