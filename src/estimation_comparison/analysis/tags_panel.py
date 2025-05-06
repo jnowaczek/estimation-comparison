@@ -12,13 +12,16 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+import itertools
 from pathlib import Path
+from typing import List
 
 import colorcet as cc
 import pandas as pd
 import panel as pn
 from bokeh.models import Band, ColumnDataSource
 from bokeh.plotting import figure
+from bokeh.transform import factor_mark
 
 from estimation_comparison.analysis.fit import quadratic_fit, linear_fit
 from estimation_comparison.database import BenchmarkDatabase
@@ -26,41 +29,44 @@ from estimation_comparison.database import BenchmarkDatabase
 db = BenchmarkDatabase(Path("benchmarks/benchmark.sqlite"))
 
 tag_name_to_id: {str, int} = {row[1]: row[0] for row in db.get_tags()}
+quality_name_to_id: {str, int} = {row[1]: row[0] for row in db.get_qualities()}
 # est_list: [Estimator] = db.get_estimators()
 
 pre_select = pn.widgets.Select(name="Preprocessor", options=[entry[1] for entry in db.get_preprocessors()])
 est_select = pn.widgets.Select(name="Estimator", options=[entry[1] for entry in db.get_estimators()])
 comp_select = pn.widgets.Select(name="Compressor", options=[entry[1] for entry in db.get_compressors()])
-tag_select = pn.widgets.MultiChoice(name="RAISE Tag", value=list(tag_name_to_id.keys()),
-                                    options=list(tag_name_to_id.keys()))
+tag_select = pn.widgets.MultiChoice(name="RAISE Tag", options=list(tag_name_to_id.keys()))
+quality_select = pn.widgets.MultiChoice(name="Image Quality", options=list(quality_name_to_id.keys()))
 
 lin_fit_show = pn.widgets.Checkbox(name="Show linear fit", value=False)
 quad_fit_show = pn.widgets.Checkbox(name="Show quadratic fit", value=False)
 
 template = pn.template.BootstrapTemplate(
     title="RAISE Tags Explorer",
-    sidebar=[pre_select, est_select, comp_select, tag_select, lin_fit_show, quad_fit_show])
+    sidebar=[pre_select, est_select, comp_select, tag_select, quality_select, lin_fit_show, quad_fit_show])
 
 
-def plot(preprocessor: str, estimator: str, compressor: str, tags: [str],
+def plot(preprocessor: str, estimator: str, compressor: str, tags: List[str], qualities: List[str],
          show_linear: bool = False, show_quadratic: bool = False):
-    data_by_tag_name = dict()
-    for tag_name in tags:
-        desc, rec = db.get_solo_tag_plot_dataframe(preprocessor, estimator, compressor, tag_name)
-        data_by_tag_name[tag_name] = pd.DataFrame.from_records(rec, columns=[item[0] for item in desc])
 
     fig = figure(y_range=(0, 10), x_range=(0, 100))
     fig.sizing_mode = "scale_both"
 
-    if not data_by_tag_name.keys():
+    if not tags or not qualities:
         fig.scatter()
 
-    for tag_name, data in data_by_tag_name.items():
+    for tag_name, quality in itertools.product(tags, qualities):
+        desc, rec = db.get_solo_tag_plot_dataframe(preprocessor, estimator, compressor, tag_name, quality)
+        data = pd.DataFrame.from_records(rec, columns=[item[0] for item in desc])
+
         tag_color = cc.glasbey_dark[tag_name_to_id[tag_name]]
 
         data["percent_size_reduction"] = (1.0 - (data["final_size"] / data["initial_size"])) * 100.0
         data.sort_values("percent_size_reduction", inplace=True)
-        fig.scatter(x="percent_size_reduction", y="metric", source=data, alpha=0.2, color=tag_color)
+        fig.scatter(x="percent_size_reduction", y="metric", source=data, alpha=0.6, color=tag_color,
+                    marker=factor_mark(field_name="quality",
+                                       markers=["star", "circle", "inverted_triangle"],
+                                       factors=list(quality_name_to_id.keys())))
 
         if show_quadratic:
             quadratic = quadratic_fit(data["percent_size_reduction"], data["metric"])
@@ -82,7 +88,7 @@ def plot(preprocessor: str, estimator: str, compressor: str, tags: [str],
             fig.line(x="percent_size_reduction", y="lin_fit", color=tag_color,
                      legend_label=f"{tag_name} Linear fit", source=source)
             lin_band = Band(base="percent_size_reduction", lower="lin_conf_lower", upper="lin_conf_upper",
-                             source=source, fill_color=tag_color, fill_alpha=0.5)
+                            source=source, fill_color=tag_color, fill_alpha=0.5)
             fig.add_layout(lin_band)
 
         if show_quadratic:
@@ -94,12 +100,12 @@ def plot(preprocessor: str, estimator: str, compressor: str, tags: [str],
 
     return pn.pane.Bokeh(fig)
 
+
 home_button = pn.widgets.Button(name="Index", button_type="primary")
 home_button.js_on_click(code="window.location.href='/panel/'")
 template.header.append(home_button)
 
-
-bokeh_pane = pn.bind(plot, pre_select, est_select, comp_select, tag_select, lin_fit_show, quad_fit_show)
+bokeh_pane = pn.bind(plot, pre_select, est_select, comp_select, tag_select, quality_select, lin_fit_show, quad_fit_show)
 
 template.main.append(bokeh_pane)
 

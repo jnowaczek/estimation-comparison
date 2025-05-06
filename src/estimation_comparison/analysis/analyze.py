@@ -22,7 +22,7 @@ from typing import List
 import pandas as pd
 import sklearn
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_validate
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import PolynomialFeatures
 
@@ -61,17 +61,22 @@ class Analyze:
 
         for (preprocessor_name, estimator_name, block_summary_func_name, file_summary_func_name) in combinations:
             for compressor_name in compressor_names:
-                desc, rec = self.database.get_solo_plot_dataframe(preprocessor_name, estimator_name, compressor_name,
-                                                                  block_summary_func_name, file_summary_func_name)
+                desc, rec = self.database.get_solo_plot_dataframe(preprocessor_name, estimator_name,
+                                                                  compressor_name,
+                                                                  block_summary_func_name,
+                                                                  file_summary_func_name)
                 data = pd.DataFrame.from_records(rec, columns=[item[0] for item in desc])
                 data["percent_size_reduction"] = (1.0 - (data["final_size"] / data["initial_size"])) * 100.0
 
                 kfold = sklearn.model_selection.KFold(n_splits=10, shuffle=True, random_state=1337)
-                linar_scores = cross_val_score(linear_pipeline, data[["metric"]], data["percent_size_reduction"], cv=kfold)
-                quad_scores = cross_val_score(quad_pipeline, data[["metric"]], data["percent_size_reduction"], cv=kfold)
+                scoring = ["r2_score", "neg_mean_squared_error"]
+                linear_scores = cross_validate(linear_pipeline, data[["metric"]], data["percent_size_reduction"],
+                                               cv=kfold, scoring=scoring)
+                quad_scores = cross_validate(quad_pipeline, data[["metric"]], data["percent_size_reduction"], cv=kfold,
+                                             scoring=scoring)
                 linear_results.append(
                     Fit(preprocessor_name, estimator_name, block_summary_func_name, file_summary_func_name,
-                        compressor_name, linar_scores))
+                        compressor_name, linear_scores))
                 quad_results.append(
                     Fit(preprocessor_name, estimator_name, block_summary_func_name, file_summary_func_name,
                         compressor_name, quad_scores))
@@ -83,6 +88,7 @@ class Analyze:
         print("=== Quadratic Fit ===")
         for x in (sorted(quad_results)):
             print(x)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

@@ -49,12 +49,28 @@ class BenchmarkDatabase:
     def _create_tables(self):
         self.con.execute(
             """
+            CREATE TABLE IF NOT EXISTS image_qualities
+            (
+                quality_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                name       TEXT                              NOT NULL UNIQUE
+            )
+            """)
+        self.con.commit()
+        self.con.execute(
+            """
+            INSERT OR IGNORE INTO image_qualities (quality_id, name)
+            VALUES (1, 'unknown')
+            """)
+        self.con.commit()
+        self.con.execute(
+            """
             CREATE TABLE IF NOT EXISTS files
             (
-                file_hash  TEXT PRIMARY KEY NOT NULL,
-                path       TEXT             NOT NULL,
-                name       TEXT             NOT NULL,
-                size_bytes INTEGER          NOT NULL
+                file_hash  TEXT PRIMARY KEY                        NOT NULL,
+                path       TEXT                                    NOT NULL,
+                name       TEXT                                    NOT NULL,
+                size_bytes INTEGER                                 NOT NULL,
+                quality_id REFERENCES image_qualities (quality_id) NOT NULL
             )
             """)
         self.con.commit()
@@ -100,11 +116,11 @@ class BenchmarkDatabase:
             """
             CREATE TABLE IF NOT EXISTS estimators
             (
-                estimator_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                name         TEXT                              NOT NULL UNIQUE,
-                parameters   BLOB,
-                summarize_block BOOLEAN NOT NULL,
-                summarize_file BOOLEAN NOT NULL
+                estimator_id    INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                name            TEXT                              NOT NULL UNIQUE,
+                parameters      BLOB,
+                summarize_block BOOLEAN                           NOT NULL,
+                summarize_file  BOOLEAN                           NOT NULL
             )
             """)
         self.con.commit()
@@ -118,7 +134,8 @@ class BenchmarkDatabase:
                 block_summary_func_id REFERENCES block_summary_funcs (block_summary_id),
                 file_summary_func_id REFERENCES file_summary_funcs (file_summary_id),
                 metric REAL                                                NOT NULL,
-                UNIQUE (file_hash, preprocessor_id, estimator_id, block_summary_func_id, file_summary_func_id) ON CONFLICT REPLACE
+                UNIQUE (file_hash, preprocessor_id, estimator_id, block_summary_func_id,
+                        file_summary_func_id) ON CONFLICT REPLACE
             )
             """)
         self.con.commit()
@@ -143,7 +160,8 @@ class BenchmarkDatabase:
             """)
         self.con.execute(
             """
-            INSERT OR IGNORE INTO block_summary_funcs (block_summary_id, name) VALUES (1, 'none')
+            INSERT OR IGNORE INTO block_summary_funcs (block_summary_id, name)
+            VALUES (1, 'none')
             """)
         self.con.commit()
         self.con.execute(
@@ -157,7 +175,8 @@ class BenchmarkDatabase:
             """)
         self.con.execute(
             """
-            INSERT OR IGNORE INTO file_summary_funcs (file_summary_id, name) VALUES (1, 'none')
+            INSERT OR IGNORE INTO file_summary_funcs (file_summary_id, name)
+            VALUES (1, 'none')
             """)
         self.con.commit()
 
@@ -236,8 +255,8 @@ class BenchmarkDatabase:
         self.con.execute(
             """
                 INSERT OR ABORT INTO files
-                VALUES (:hash, :path, :name, :size_bytes)
-                """, (file.hash, file.path, file.name, file.size_bytes))
+                VALUES (:hash, :path, :name, :size_bytes, :quality_id)
+                """, (file.hash, file.path, file.name, file.size_bytes, 1))
         self.con.commit()
 
     def update_files(self, client: dask.distributed.Client, locations):
@@ -272,18 +291,35 @@ class BenchmarkDatabase:
     def update_tags(self, tags_csv: Path):
         try:
             with open(tags_csv, "r") as f:
-                reader = csv.DictReader(f, restkey="Tags")
+                reader = csv.DictReader(f)
                 unique_tags = set()
+                unique_formats = set()
                 file_tags: List[Tuple[str, str]] = []
+                file_formats: List[Tuple[str, str]] = []
                 for row in reader:
                     tags: List[str] = (row["Keywords"] + (row["Tags"] if "Tags" in row.keys() else "")
                                        ).replace(";", "").split(" ")
+                    format_name: str = row["Image Quality"]
+                    file_formats.append((format_name.lower(), "RAISE/" + row["File"]))
+
+                    unique_formats.add((format_name.lower(),))
                     unique_tags.update(map(lambda x: (x.lower(),), tags))
 
                     for tag in tags:
                         file_tags.append(("RAISE/" + row["File"], tag.lower()))
 
+                self.con.executemany("INSERT OR IGNORE INTO image_qualities(name) VALUES(?)", unique_formats)
+                self.con.commit()
+
                 self.con.executemany("INSERT OR IGNORE INTO tag_types(tag_name) VALUES(?)", unique_tags)
+                self.con.commit()
+
+                self.con.executemany(
+                    """
+                    UPDATE files
+                    SET quality_id = (SELECT quality_id FROM image_qualities WHERE name = ?)
+                    WHERE file_hash = (SELECT file_hash FROM files WHERE files.name = ?)
+                    """, file_formats)
                 self.con.commit()
 
                 self.con.executemany(
@@ -300,8 +336,8 @@ class BenchmarkDatabase:
         try:
             self.con.execute(
                 """INSERT INTO compression_results
-                       VALUES (:hash, (SELECT compressor_id FROM compressors WHERE name = :compressor_name), :size_bytes)
-                       """, (new_result.input_file.hash, new_result.compressor.name, new_result.compressed_size_bytes))
+                   VALUES (:hash, (SELECT compressor_id FROM compressors WHERE name = :compressor_name), :size_bytes)
+                """, (new_result.input_file.hash, new_result.compressor.name, new_result.compressed_size_bytes))
             self.con.commit()
         except sqlite3.Error as e:
             logging.exception(e)
@@ -343,12 +379,14 @@ class BenchmarkDatabase:
         results = []
         for row in self.con.execute(
                 """
-                    SELECT file_hash,
-                           (SELECT name FROM compressors WHERE compression_results.compressor_id = compressors.compressor_id),
-                           size_bytes
-                    FROM compression_results
-                    WHERE file_hash = ?
-                    """,
+                SELECT file_hash,
+                       (SELECT name
+                        FROM compressors
+                        WHERE compression_results.compressor_id = compressors.compressor_id),
+                       size_bytes
+                FROM compression_results
+                WHERE file_hash = ?
+                """,
                 (file_hash,)).fetchall():
             results.append(CompressionResult(*row))
         return results
@@ -357,7 +395,11 @@ class BenchmarkDatabase:
         results: [CompressionTask] = []
         for row in self.con.execute(
                 """
-                SELECT combi.file_hash, combi.file_name, combi.file_path, combi.uncompressed_size_bytes, combi.compressor_name
+                SELECT combi.file_hash,
+                       combi.file_name,
+                       combi.file_path,
+                       combi.uncompressed_size_bytes,
+                       combi.compressor_name
                 FROM (SELECT DISTINCT file_hash,
                                       files.path       AS file_path,
                                       files.name       AS file_name,
@@ -397,7 +439,10 @@ class BenchmarkDatabase:
                      file_summary_permutations AS (SELECT estimator_id, est_name, fsf.name AS fsf_name
                                                    FROM estimators_with_file_summary_func
                                                             CROSS JOIN file_summary_funcs fsf),
-                     block_summary_permutations AS (SELECT estimator_id, est_name, bsf.name AS bsf_name, fsf.name AS fsf_name
+                     block_summary_permutations AS (SELECT estimator_id,
+                                                           est_name,
+                                                           bsf.name AS bsf_name,
+                                                           fsf.name AS fsf_name
                                                     FROM estimators_with_block_summary_func
                                                              CROSS JOIN block_summary_func_without_none bsf
                                                              CROSS JOIN file_summary_func_without_none fsf),
@@ -505,6 +550,9 @@ class BenchmarkDatabase:
     def get_tags(self) -> List[Tuple[int, str]]:
         return self.con.execute("SELECT tag_id, tag_name FROM tag_types").fetchall()
 
+    def get_qualities(self) -> List[Tuple[int, str]]:
+        return self.con.execute("SELECT quality_id, name FROM image_qualities").fetchall()
+
     def get_combinations(self) -> List[Tuple[str, str, str]]:
         return self.con.execute(
             """
@@ -525,7 +573,10 @@ class BenchmarkDatabase:
                  file_summary_permutations AS (SELECT estimator_id, est_name, fsf.name AS fsf_name
                                                FROM estimators_with_file_summary_func
                                                         CROSS JOIN file_summary_func_without_none fsf),
-                 block_summary_permutations AS (SELECT estimator_id, est_name, bsf.name AS bsf_name, fsf.name AS fsf_name
+                 block_summary_permutations AS (SELECT estimator_id,
+                                                       est_name,
+                                                       bsf.name AS bsf_name,
+                                                       fsf.name AS fsf_name
                                                 FROM estimators_with_block_summary_func
                                                          CROSS JOIN block_summary_func_without_none bsf
                                                          CROSS JOIN file_summary_func_without_none fsf),
@@ -545,7 +596,7 @@ class BenchmarkDatabase:
                    ep.bsf_name,
                    ep.fsf_name
             FROM estimator_permutations ep
-                    CROSS JOIN preprocessors
+                     CROSS JOIN preprocessors
             """).fetchall()
 
     def get_all_estimations_dataframe(self):
@@ -556,7 +607,7 @@ class BenchmarkDatabase:
                    estimator_id,
                    compressor_id,
                    metric,
-                   files.size_bytes AS initial_size,
+                   files.size_bytes               AS initial_size,
                    compression_results.size_bytes AS final_size
             FROM compression_results
                      INNER JOIN file_estimations ON compression_results.file_hash = file_estimations.file_hash
@@ -565,7 +616,7 @@ class BenchmarkDatabase:
             """)
         return cursor.description, cursor.fetchall()
 
-    def get_solo_tag_plot_dataframe(self, preprocessor: str, estimator: str, compressor: str, tag: str):
+    def get_solo_tag_plot_dataframe(self, preprocessor: str, estimator: str, compressor: str, tag: str, quality: str):
         cursor = self.con.execute(
             """
             WITH files_with_tag AS (SELECT file_hash
@@ -578,61 +629,65 @@ class BenchmarkDatabase:
                                              INNER JOIN files_with_tag fwt ON fwt.file_hash = f.file_hash)
             SELECT fe.file_hash,
                    fe.metric,
-                   ff.size_bytes as initial_size,
-                   cr.size_bytes as final_size
+                   ff.size_bytes AS initial_size,
+                   cr.size_bytes AS final_size,
+                   iq.name AS quality
             FROM file_estimations fe
                      INNER JOIN filtered_files ff ON ff.file_hash = fe.file_hash
                      INNER JOIN compression_results cr ON cr.file_hash = fe.file_hash
+                     INNER JOIN image_qualities iq ON iq.quality_id = ff.quality_id
             WHERE metric IS NOT NULL
               AND fe.preprocessor_id = (SELECT preprocessor_id FROM preprocessors WHERE name = ?)
               AND fe.estimator_id = (SELECT estimator_id FROM estimators WHERE name = ?)
               AND cr.compressor_id = (SELECT compressor_id FROM compressors WHERE name = ?)
-            ORDER BY name
-            """, (tag, preprocessor, estimator, compressor))
+              AND iq.name = ?
+            ORDER BY ff.name
+            """, (tag, preprocessor, estimator, compressor, quality))
         return cursor.description, cursor.fetchall()
 
     def get_solo_plot_dataframe(self, preprocessor: str, estimator: str, compressor: str, block_summary_fn: str,
                                 file_summary_fn: str):
         cursor = self.con.execute(
             """
-                SELECT fe.file_hash,
-                       fe.metric,
-                       f.size_bytes as initial_size,
-                       cr.size_bytes as final_size
-                FROM file_estimations fe
-                         INNER JOIN files f ON f.file_hash = fe.file_hash
-                         INNER JOIN compression_results cr ON cr.file_hash = fe.file_hash
-                WHERE metric IS NOT NULL
-                  AND fe.preprocessor_id = (SELECT preprocessor_id FROM preprocessors WHERE name = ?)
-                  AND fe.estimator_id = (SELECT estimator_id FROM estimators WHERE name = ?)
-                  AND cr.compressor_id = (SELECT compressor_id FROM compressors WHERE name = ?)
-                  AND fe.block_summary_func_id = (SELECT block_summary_id FROM block_summary_funcs WHERE name = ?)
-                  AND fe.file_summary_func_id = (SELECT file_summary_id FROM file_summary_funcs WHERE name = ?)
-                ORDER BY name
-                """, (preprocessor, estimator, compressor, block_summary_fn, file_summary_fn))
+            SELECT fe.file_hash,
+                   fe.metric,
+                   f.size_bytes  as initial_size,
+                   cr.size_bytes as final_size
+            FROM file_estimations fe
+                     INNER JOIN files f ON f.file_hash = fe.file_hash
+                     INNER JOIN compression_results cr ON cr.file_hash = fe.file_hash
+            WHERE metric IS NOT NULL
+              AND fe.preprocessor_id = (SELECT preprocessor_id FROM preprocessors WHERE name = ?)
+              AND fe.estimator_id = (SELECT estimator_id FROM estimators WHERE name = ?)
+              AND cr.compressor_id = (SELECT compressor_id FROM compressors WHERE name = ?)
+              AND fe.block_summary_func_id = (SELECT block_summary_id FROM block_summary_funcs WHERE name = ?)
+              AND fe.file_summary_func_id = (SELECT file_summary_id FROM file_summary_funcs WHERE name = ?)
+            ORDER BY name
+            """, (preprocessor, estimator, compressor, block_summary_fn, file_summary_fn))
         return cursor.description, cursor.fetchall()
 
-    def get_solo_tag_plot_dataframe_with_tags(self, preprocessor: str, estimator: str, compressor: str, block_summary_fn: str,
-                                file_summary_fn: str):
+    def get_solo_plot_dataframe_with_tags(self, preprocessor: str, estimator: str, compressor: str,
+                                          block_summary_fn: str,
+                                          file_summary_fn: str):
         cursor = self.con.execute(
             """
-                SELECT fe.file_hash,
-                       fe.metric,
-                       f.size_bytes as initial_size,
-                       cr.size_bytes as final_size,
-                       GROUP_CONCAT(DISTINCT (SELECT tag_name FROM tag_types where ft.tag_id = tag_types.tag_id)) as tags
-                FROM file_estimations fe
-                         INNER JOIN files f ON f.file_hash = fe.file_hash
-                         INNER JOIN compression_results cr ON cr.file_hash = fe.file_hash
-                         LEFT JOIN file_tags ft ON f.file_hash = ft.file_hash
-                WHERE metric IS NOT NULL
-                  AND fe.preprocessor_id = (SELECT preprocessor_id FROM preprocessors WHERE name = ?)
-                  AND fe.estimator_id = (SELECT estimator_id FROM estimators WHERE name = ?)
-                  AND cr.compressor_id = (SELECT compressor_id FROM compressors WHERE name = ?)
-                  AND fe.block_summary_func_id = (SELECT block_summary_id FROM block_summary_funcs WHERE name = ?)
-                  AND fe.file_summary_func_id = (SELECT file_summary_id FROM file_summary_funcs WHERE name = ?)
-                GROUP BY fe.file_hash
-                """, (preprocessor, estimator, compressor, block_summary_fn, file_summary_fn))
+            SELECT fe.file_hash,
+                   fe.metric,
+                   f.size_bytes                                                                               as initial_size,
+                   cr.size_bytes                                                                              as final_size,
+                   GROUP_CONCAT(DISTINCT (SELECT tag_name FROM tag_types where ft.tag_id = tag_types.tag_id)) as tags
+            FROM file_estimations fe
+                     INNER JOIN files f ON f.file_hash = fe.file_hash
+                     INNER JOIN compression_results cr ON cr.file_hash = fe.file_hash
+                     LEFT JOIN file_tags ft ON f.file_hash = ft.file_hash
+            WHERE metric IS NOT NULL
+              AND fe.preprocessor_id = (SELECT preprocessor_id FROM preprocessors WHERE name = ?)
+              AND fe.estimator_id = (SELECT estimator_id FROM estimators WHERE name = ?)
+              AND cr.compressor_id = (SELECT compressor_id FROM compressors WHERE name = ?)
+              AND fe.block_summary_func_id = (SELECT block_summary_id FROM block_summary_funcs WHERE name = ?)
+              AND fe.file_summary_func_id = (SELECT file_summary_id FROM file_summary_funcs WHERE name = ?)
+            GROUP BY fe.file_hash
+            """, (preprocessor, estimator, compressor, block_summary_fn, file_summary_fn))
         return cursor.description, cursor.fetchall()
 
     @staticmethod
