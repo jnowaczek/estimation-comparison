@@ -53,8 +53,9 @@ template = pn.template.BootstrapTemplate(
 def plot(preprocessor: str, estimator: str, compressor: str, tags: List[str], qualities: List[str],
          x_range: (int, int), y_range: (int, int), show_linear: bool = False, show_quadratic: bool = False):
     fig = figure(y_range=y_range, x_range=x_range, output_backend="svg",
-                 x_axis_label="Percent Size Reduction", y_axis_label="Estimator Metric", width=800, height=600)
-    fig.sizing_mode = "fixed"
+                 x_axis_label="Percent Size Reduction", y_axis_label="Estimator Metric",
+                 width=800, height=600, sizing_mode="fixed")
+    fig.legend.location = "bottom_left"
 
     if not tags or not qualities:
         fig.scatter()
@@ -90,14 +91,14 @@ def plot(preprocessor: str, estimator: str, compressor: str, tags: List[str], qu
 
         if show_linear:
             fig.line(x="percent_size_reduction", y="lin_fit", color=tag_color,
-                     legend_label=f"{tag_name} Linear fit", source=source)
+                     legend_label=f"{tag_name}", source=source)
             lin_band = Band(base="percent_size_reduction", lower="lin_conf_lower", upper="lin_conf_upper",
                             source=source, fill_color=tag_color, fill_alpha=0.5)
             fig.add_layout(lin_band)
 
         if show_quadratic:
             fig.line(x="percent_size_reduction", y="quad_fit", color=tag_color,
-                     legend_label=f"{tag_name} Quadratic fit", source=source)
+                     legend_label=f"{tag_name}", source=source)
             quad_band = Band(base="percent_size_reduction", lower="quad_conf_lower", upper="quad_conf_upper",
                              source=source, fill_color=tag_color, fill_alpha=0.5)
             fig.add_layout(quad_band)
