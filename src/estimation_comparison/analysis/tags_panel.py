@@ -48,8 +48,7 @@ template = pn.template.BootstrapTemplate(
 
 def plot(preprocessor: str, estimator: str, compressor: str, tags: List[str], qualities: List[str],
          show_linear: bool = False, show_quadratic: bool = False):
-
-    fig = figure(y_range=(0, 10), x_range=(0, 100))
+    fig = figure(y_range=(0, 10), x_range=(0, 100), output_backend="webgl")
     fig.sizing_mode = "scale_both"
 
     if not tags or not qualities:
