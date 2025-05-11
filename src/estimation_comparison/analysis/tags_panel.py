@@ -54,7 +54,7 @@ def plot(preprocessor: str, estimator: str, compressor: str, tags: List[str], qu
          x_range: (int, int), y_range: (int, int), show_linear: bool = False, show_quadratic: bool = False):
     fig = figure(y_range=y_range, x_range=x_range, output_backend="webgl",
                  x_axis_label="Percent Size Reduction", y_axis_label="Estimator Metric",
-                 width=800, height=600, sizing_mode="fixed")
+                 width=1600, height=1200, sizing_mode="fixed")
 
     if not tags or not qualities:
         fig.scatter()
