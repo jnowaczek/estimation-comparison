@@ -41,14 +41,18 @@ quality_select = pn.widgets.MultiChoice(name="Image Quality", options=list(quali
 lin_fit_show = pn.widgets.Checkbox(name="Show linear fit", value=False)
 quad_fit_show = pn.widgets.Checkbox(name="Show quadratic fit", value=False)
 
+x_axis_range = pn.widgets.EditableRangeSlider(name="X Axis Range", fixed_start=0, fixed_end=100, step=1)
+y_axis_range = pn.widgets.EditableRangeSlider(name="Y Axis Range", start=0, end=10)
+
 template = pn.template.BootstrapTemplate(
     title="RAISE Tags Explorer",
-    sidebar=[pre_select, est_select, comp_select, tag_select, quality_select, lin_fit_show, quad_fit_show])
+    sidebar=[pre_select, est_select, comp_select, tag_select, quality_select, lin_fit_show, quad_fit_show, x_axis_range,
+             y_axis_range])
 
 
 def plot(preprocessor: str, estimator: str, compressor: str, tags: List[str], qualities: List[str],
-         show_linear: bool = False, show_quadratic: bool = False):
-    fig = figure(y_range=(0, 10), x_range=(0, 100), output_backend="svg")
+         x_range: (int, int), y_range: (int, int), show_linear: bool = False, show_quadratic: bool = False):
+    fig = figure(y_range=y_range, x_range=x_range, output_backend="svg")
     fig.sizing_mode = "scale_both"
 
     if not tags or not qualities:
@@ -104,7 +108,8 @@ home_button = pn.widgets.Button(name="Index", button_type="primary")
 home_button.js_on_click(code="window.location.href='/panel/'")
 template.header.append(home_button)
 
-bokeh_pane = pn.bind(plot, pre_select, est_select, comp_select, tag_select, quality_select, lin_fit_show, quad_fit_show)
+bokeh_pane = pn.bind(plot, pre_select, est_select, comp_select, tag_select, quality_select, x_axis_range, y_axis_range,
+                     lin_fit_show, quad_fit_show)
 
 template.main.append(bokeh_pane)
 
