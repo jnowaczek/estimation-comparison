@@ -52,7 +52,8 @@ template = pn.template.BootstrapTemplate(
 
 def plot(preprocessor: str, estimator: str, compressor: str, tags: List[str], qualities: List[str],
          x_range: (int, int), y_range: (int, int), show_linear: bool = False, show_quadratic: bool = False):
-    fig = figure(y_range=y_range, x_range=x_range, output_backend="svg")
+    fig = figure(y_range=y_range, x_range=x_range, output_backend="svg",
+                 x_axis_label="Percent Size Reduction", y_axis_label="Estimator Metric")
     fig.sizing_mode = "scale_both"
 
     if not tags or not qualities:
