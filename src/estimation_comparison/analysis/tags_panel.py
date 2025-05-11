@@ -55,7 +55,6 @@ def plot(preprocessor: str, estimator: str, compressor: str, tags: List[str], qu
     fig = figure(y_range=y_range, x_range=x_range, output_backend="svg",
                  x_axis_label="Percent Size Reduction", y_axis_label="Estimator Metric",
                  width=800, height=600, sizing_mode="fixed")
-    fig.legend.location = "bottom_left"
 
     if not tags or not qualities:
         fig.scatter()
@@ -102,6 +101,8 @@ def plot(preprocessor: str, estimator: str, compressor: str, tags: List[str], qu
             quad_band = Band(base="percent_size_reduction", lower="quad_conf_lower", upper="quad_conf_upper",
                              source=source, fill_color=tag_color, fill_alpha=0.5)
             fig.add_layout(quad_band)
+
+        fig.legend.location = "bottom_left"
 
     return pn.pane.Bokeh(fig)
 
