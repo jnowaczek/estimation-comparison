@@ -12,13 +12,10 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import itertools
-
 import numpy as np
-import dask.array as da
 import scipy.signal as signal
 # noinspection PyProtectedMember
-from traitlets import Callable, Int
+from traitlets import Int
 
 from estimation_comparison.data_collection.estimator.base import EstimatorBase
 
@@ -26,21 +23,12 @@ from estimation_comparison.data_collection.estimator.base import EstimatorBase
 class Autocovariance(EstimatorBase):
     block_size = Int(1024)
 
-    def estimate(self, data: np.ndarray) -> da.Array:
-        def normalize(block: da.Array) -> np.ndarray:
-            print(f"block shape: {block.shape}")
-            return da.divide(da.subtract(block, da.mean(block)), da.power(da.std(block), 2))
+    def estimate(self, data: np.ndarray) -> np.ndarray:
+        def autocovariance(block):
+            mean = np.mean(block)
+            zero_mean = np.subtract(block, mean)
+            correlation = signal.correlate(zero_mean, zero_mean)
+            return np.divide(correlation, self.block_size)
 
-        def autocorrelate(block):
-            return signal.correlate(block, block)
-
-        data_array = da.from_array(data[:data.shape[0] // self.block_size * self.block_size], self.block_size)
-        data_array = da.reshape(data_array, (-1, self.block_size))
-
-        normalized = da.apply_along_axis(normalize, 1, arr=data_array)
-        numerators = da.apply_along_axis(autocorrelate, 1, arr=normalized)
-        denominators = da.apply_along_axis(autocorrelate, 1, arr=normalized)
-        a = da.divide(numerators, denominators, out=da.zeros_like(numerators), where=denominators != 0,
-                                     dtype=da.float32)
-        print(f"ayto {data.shape}, {data_array.shape}, {a.shape}, {normalized.shape}")
-        return a
+        data_array = np.reshape(data[:len(data) // self.block_size * self.block_size], (-1, self.block_size))
+        return np.apply_along_axis(autocovariance, 1, data_array)

@@ -631,7 +631,7 @@ class BenchmarkDatabase:
                    fe.metric,
                    ff.size_bytes AS initial_size,
                    cr.size_bytes AS final_size,
-                   iq.name AS quality
+                   iq.name       AS quality
             FROM file_estimations fe
                      INNER JOIN filtered_files ff ON ff.file_hash = fe.file_hash
                      INNER JOIN compression_results cr ON cr.file_hash = fe.file_hash
@@ -688,6 +688,49 @@ class BenchmarkDatabase:
               AND fe.file_summary_func_id = (SELECT file_summary_id FROM file_summary_funcs WHERE name = ?)
             GROUP BY fe.file_hash
             """, (preprocessor, estimator, compressor, block_summary_fn, file_summary_fn))
+        return cursor.description, cursor.fetchall()
+
+    def get_plot_dataframe(self,
+                           preprocessors: List[str],
+                           estimators: List[str],
+                           compressors: List[str],
+                           block_summary_fns: List[str],
+                           file_summary_fns: List[str],
+                           qualities: List[str],
+                           tags: List[str]):
+        cursor = self.con.execute(
+            """
+            WITH preprocessor_ids AS (SELECT preprocessor_id FROM preprocessors WHERE name IN ?),
+                 estimator_ids AS (SELECT estimator_id FROM estimators WHERE name IN ?),
+                 compressor_ids AS (SELECT compressor_id FROM compressors WHERE name IN ?),
+                 block_summary_func_ids AS (SELECT block_summary_id FROM block_summary_funcs WHERE name IN ?),
+                 file_summary_func_ids AS (SELECT file_summary_id FROM file_summary_funcs WHERE name IN ?),
+                 quality_ids AS (SELECT quality_id FROM image_qualities WHERE name IN ?),
+                 tag_ids AS (SELECT tag_id FROM tag_types WHERE tag_name IN ?)
+            SELECT fe.file_hash,
+                   fe.preprocessor_id,
+                   fe.estimator_id,
+                   cr.compressor_id,
+                   fe.block_summary_func_id,
+                   fe.file_summary_func_id,
+                   fe.metric,
+                   f.quality_id,
+                   f.size_bytes                                                                               as initial_size,
+                   cr.size_bytes                                                                              as final_size,
+                   GROUP_CONCAT(DISTINCT (SELECT tag_name FROM tag_types where ft.tag_id = tag_types.tag_id)) as tags
+            FROM file_estimations fe
+                     INNER JOIN files f ON f.file_hash = fe.file_hash
+                     INNER JOIN compression_results cr ON cr.file_hash = fe.file_hash
+                     LEFT JOIN file_tags ft ON f.file_hash = ft.file_hash
+            WHERE metric IS NOT NULL
+              AND fe.preprocessor_id IN preprocessor_ids
+              AND fe.estimator_id IN estimator_ids
+              AND cr.compressor_id IN compressor_ids
+              AND fe.block_summary_func_id IN block_summary_func_ids
+              AND fe.file_summary_func_id IN file_summary_func_ids
+              AND f.quality_id IN quality_ids
+            GROUP BY fe.file_hash
+            """, (preprocessors, estimators, compressors, block_summary_fns, file_summary_fns, qualities, tags))
         return cursor.description, cursor.fetchall()
 
     @staticmethod

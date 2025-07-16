@@ -69,7 +69,7 @@ class Analyze:
                 data["percent_size_reduction"] = (1.0 - (data["final_size"] / data["initial_size"])) * 100.0
 
                 kfold = sklearn.model_selection.KFold(n_splits=10, shuffle=True, random_state=1337)
-                scoring = ["r2_score", "neg_mean_squared_error"]
+                scoring = ["r2", "neg_mean_squared_error"]
                 linear_scores = cross_validate(linear_pipeline, data[["metric"]], data["percent_size_reduction"],
                                                cv=kfold, scoring=scoring)
                 quad_scores = cross_validate(quad_pipeline, data[["metric"]], data["percent_size_reduction"], cv=kfold,
@@ -82,11 +82,11 @@ class Analyze:
                         compressor_name, quad_scores))
 
         print("=== Linear Fit ===")
-        for x in (sorted(linear_results)):
+        for x in linear_results:
             print(x)
 
         print("=== Quadratic Fit ===")
-        for x in (sorted(quad_results)):
+        for x in quad_results:
             print(x)
 
 

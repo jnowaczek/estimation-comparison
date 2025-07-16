@@ -25,15 +25,11 @@ class Autocorrelation(EstimatorBase):
 
     def estimate(self, data: np.ndarray) -> np.ndarray:
         def autocorrelate(block):
-            return signal.correlate(block, block)
+            mean = np.mean(block)
+            var = np.var(block)
+            zero_mean = np.subtract(block, mean)
+            correlation = signal.correlate(zero_mean, zero_mean)
+            return np.divide(correlation, (var * self.block_size))
 
-        trimmed_data = data[:data.shape[0] // self.block_size * self.block_size]
-
-        data_mean = np.mean(trimmed_data)
-        data_std_dev_sqrd = np.std(trimmed_data) ** 2
-
-        data_array = np.reshape(trimmed_data, (-1, self.block_size))
-
-        data_array = np.subtract(data_array, data_mean)  # Zero mean
-        correlation = np.apply_along_axis(autocorrelate, 1, data_array)
-        return np.divide(correlation, data_std_dev_sqrd)
+        data_array = np.reshape(data[:len(data) // self.block_size * self.block_size], (-1, self.block_size))
+        return np.apply_along_axis(autocorrelate, 1, data_array)

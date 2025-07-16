@@ -85,8 +85,8 @@ class PlotEditor(pn.viewable.Viewer):
 
     @staticmethod
     def _plot(series):
-        fig = figure(x_range=Range1d(0, 100))
-        fig.sizing_mode = "scale_both"
+        fig = figure(x_range=Range1d(0, 100), width=800, height=600, x_axis_label="Percent Size Reduction",
+                     y_axis_label="Estimator Metric")
 
         for index, s in enumerate(series):
             desc, rec = db.get_solo_plot_dataframe(s.preprocessor, s.estimator, s.compressor, s.block_summary_fn,
