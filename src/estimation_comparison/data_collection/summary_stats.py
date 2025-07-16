@@ -44,3 +44,9 @@ def autocorrelation_lag(x, lag: int) -> float:
 
 def proportion_above_metric_cutoff(x, cutoff: float) -> float:
     return len(np.asarray(np.abs(x) > cutoff).nonzero()[0]) / len(x)
+
+
+def mean_inside_middle_notch(x, notch_width: int):
+    start = (len(x) // 2) - (notch_width // 2)
+    end = (len(x) // 2) + (notch_width // 2)
+    return np.mean(x[start:end])

@@ -27,6 +27,9 @@ class Autocorrelation(EstimatorBase):
         def autocorrelate(block):
             mean = np.mean(block)
             var = np.var(block)
+            if var == 0:
+                # if the variance is zero it should have an autocorrelation of 1
+                return np.ones(shape=(block.shape[0] * 2 - 1))
             zero_mean = np.subtract(block, mean)
             correlation = signal.correlate(zero_mean, zero_mean)
             return np.divide(correlation, (var * self.block_size))

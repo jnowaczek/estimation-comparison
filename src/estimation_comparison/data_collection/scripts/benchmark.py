@@ -33,7 +33,7 @@ from estimation_comparison.data_collection.estimator import *
 from estimation_comparison.data_collection.preprocessor import FlattenSampler, PatchSampler
 from estimation_comparison.data_collection.preprocessor.linear_sample import LinearSampler
 from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch, autocorrelation_lag, \
-    proportion_above_metric_cutoff
+    proportion_above_metric_cutoff, mean_inside_middle_notch
 from estimation_comparison.database import BenchmarkDatabase
 from estimation_comparison.model import Compressor, Estimator, Preprocessor, InputFile, IntermediateEstimationResult, \
     EstimationResult, LoadedData, BlockSummaryFunc, FileSummaryFunc, PreprocessedData
@@ -49,18 +49,22 @@ class Benchmark:
 
         self._preprocessors: List[Preprocessor] = [
             Preprocessor(name="entire_file", instance=FlattenSampler()),
-            Preprocessor(name="patch_random_25%", instance=PatchSampler(fraction=0.25, patch_dim=24)),
-            Preprocessor(name="patch_random_50%", instance=PatchSampler(fraction=0.5, patch_dim=24)),
-            Preprocessor(name="patch_random_75%", instance=PatchSampler(fraction=0.75, patch_dim=24)),
-            Preprocessor(name="linear_random_25%", instance=LinearSampler(fraction=0.25, patch_dim=24)),
-            Preprocessor(name="linear_random_50%", instance=LinearSampler(fraction=0.5, patch_dim=24)),
-            Preprocessor(name="linear_random_75%", instance=LinearSampler(fraction=0.75, patch_dim=24)),
+            Preprocessor(name="patch_random_25%", instance=PatchSampler(fraction=0.25, patch_dim=18)),
+            Preprocessor(name="patch_random_50%", instance=PatchSampler(fraction=0.5, patch_dim=18)),
+            Preprocessor(name="patch_random_75%", instance=PatchSampler(fraction=0.75, patch_dim=18)),
+            Preprocessor(name="linear_random_25%", instance=LinearSampler(fraction=0.25, patch_dim=18)),
+            Preprocessor(name="linear_random_50%", instance=LinearSampler(fraction=0.5, patch_dim=18)),
+            Preprocessor(name="linear_random_75%", instance=LinearSampler(fraction=0.75, patch_dim=18)),
         ]
 
         self._block_summary_funcs: List[BlockSummaryFunc] = [
             BlockSummaryFunc(name="max_outside_middle_notch_64",
                              instance=max_outside_middle_notch,
                              parameters={"notch_width": 64}
+                             ),
+            BlockSummaryFunc(name="lag_0",
+                             instance=autocorrelation_lag,
+                             parameters={"lag": 0}
                              ),
             BlockSummaryFunc(name="lag_1",
                              instance=autocorrelation_lag,
@@ -69,6 +73,22 @@ class Benchmark:
             BlockSummaryFunc(name="lag_3",
                              instance=autocorrelation_lag,
                              parameters={"lag": 3}
+                             ),
+            BlockSummaryFunc(name="mean_inside_middle_notch_64",
+                             instance=mean_inside_middle_notch,
+                             parameters={"notch_width": 64}
+                             ),
+            BlockSummaryFunc(name="mean_inside_middle_notch_128",
+                             instance=mean_inside_middle_notch,
+                             parameters={"notch_width": 128}
+                             ),
+            BlockSummaryFunc(name="mean_inside_middle_notch_256",
+                             instance=mean_inside_middle_notch,
+                             parameters={"notch_width": 256}
+                             ),
+            BlockSummaryFunc(name="mean_inside_middle_notch_512",
+                             instance=mean_inside_middle_notch,
+                             parameters={"notch_width": 512}
                              ),
         ]
 
@@ -84,13 +104,22 @@ class Benchmark:
         ]
 
         self._estimators: List[Estimator] = [
+            # Estimator(
+            #     name="autocorrelation_1728",
+            #     instance=Autocorrelation(
+            #         block_size=1728
+            #     ),
+            #     summarize_block=True,
+            #     summarize_file=True
+            # ),
             Estimator(
-                name="autocorrelation_1728",
+                name="autocorrelation_972",
                 instance=Autocorrelation(
-                    block_size=1728
+                    block_size=972
                 ),
                 summarize_block=True,
-                summarize_file=True            ),
+                summarize_file=True
+            ),
             # Estimator(name="bytecount_file", instance=ByteCount()),
             # Estimator(name="entropy_bits", instance=Entropy()),
         ]
