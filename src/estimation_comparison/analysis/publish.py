@@ -21,11 +21,10 @@ import pandas as pd
 import sklearn
 from bokeh.models import Range1d
 from bokeh.plotting import figure
+from matplotlib import pyplot as plt
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import permutation_test_score
 from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import PolynomialFeatures
-from matplotlib import pyplot as plt
 
 from estimation_comparison.data_collection.estimator import Autocorrelation
 from estimation_comparison.database import BenchmarkDatabase
@@ -97,12 +96,12 @@ def render(graph: GraphSpec):
 def build_table(combinations: list[tuple[str, str, str]]):
     linear_results = pd.DataFrame(
         columns=["Compression Algorithm", "NRMSE", "p-value", "estimator", "summary statistic"])
-    quad_results = pd.DataFrame(columns=["Compression Algorithm", "NRMSE", "p-value", "estimator", "summary statistic"])
+    # quad_results = pd.DataFrame(columns=["Compression Algorithm", "NRMSE", "p-value", "estimator", "summary statistic"])
 
     compressor_names = [c[1] for c in db.get_compressors()]
 
     linear_pipeline = make_pipeline(LinearRegression())
-    quad_pipeline = make_pipeline(PolynomialFeatures(2), LinearRegression())
+    # quad_pipeline = make_pipeline(PolynomialFeatures(2), LinearRegression())
 
     for (preprocessor_name, estimator_name, block_summary_func_name, file_summary_func_name) in combinations:
         for compressor_name in compressor_names:
@@ -120,22 +119,23 @@ def build_table(combinations: list[tuple[str, str, str]]):
                                                                     cv=kfold,
                                                                     scoring="neg_root_mean_squared_error",
                                                                     random_state=1337)
-            quad_score, _, pvalue_quad = permutation_test_score(quad_pipeline, data[["metric"]],
-                                                                data["percent_size_reduction"],
-                                                                cv=kfold,
-                                                                scoring="neg_root_mean_squared_error",
-                                                                random_state=1337)
+            # quad_score, _, pvalue_quad = permutation_test_score(quad_pipeline, data[["metric"]],
+            #                                                     data["percent_size_reduction"],
+            #                                                     cv=kfold,
+            #                                                     scoring="neg_root_mean_squared_error",
+            #                                                     random_state=1337)
 
             linear_results.loc[len(linear_results)] = [compressor_name, linear_score, pvalue_linear, estimator_name,
                                                        block_summary_func_name]
-            quad_results.loc[len(linear_results)] = [compressor_name, quad_score, pvalue_quad, estimator_name,
-                                                     block_summary_func_name]
+            # quad_results.loc[len(linear_results)] = [compressor_name, quad_score, pvalue_quad, estimator_name,
+            #                                          block_summary_func_name]
 
     # SKL uses negative RMSE, fix that
     linear_results["RMSE"] = abs(linear_results["NRMSE"])
-    quad_results["RMSE"] = abs(quad_results["NRMSE"])
+    # quad_results["RMSE"] = abs(quad_results["NRMSE"])
 
-    return linear_results.sort_values("RMSE"), quad_results.sort_values("RMSE")
+    return linear_results.sort_values("RMSE")  # , quad_results.sort_values("RMSE")
+
 
 def autocorrelation_example():
     a = Autocorrelation(block_size=7)
@@ -147,14 +147,13 @@ def autocorrelation_example():
 
     f = plt.figure()
     ax = f.add_subplot(1, 2, 1)
-    ax.plot(x , x)
+    ax.plot(x, x)
     ax = f.add_subplot(1, 2, 2)
-    ax.plot( range(-6, 7), y)
+    ax.plot(range(-6, 7), y)
     plt.show()
 
+
 if __name__ == "__main__":
-    autocorrelation_example()
-    input()
     # print("Bytecount")
     # bytecount_basic = filter(lambda c: c[0] == "entire_file" and c[1] == "bytecount_file", db.get_combinations())
     #
@@ -171,16 +170,8 @@ if __name__ == "__main__":
 
     print("Autocorrelation 972 notch")
     autocorrelation_972_basic = filter(
-        lambda c: c[0] == "entire_file" and c[1] == "autocorrelation_972", db.get_combinations())
+        lambda c: c[0] == "entire_file" and c[1] == "autocorrelation_972" and c[2] == "mean_inside_middle_notch_512",
+        db.get_combinations())
 
-    tables = build_table(list(autocorrelation_972_basic))
-    for table in tables:
-        print(table[["Compression Algorithm", "summary statistic", "RMSE", "p-value"]].to_latex(index=False))
-
-    print("Autocorrelation 1278 notch")
-    autocorrelation_1728_basic = filter(
-        lambda c: c[0] == "entire_file" and c[1] == "autocorrelation_1728", db.get_combinations())
-
-    tables = build_table(list(autocorrelation_1728_basic))
-    for table in tables:
-        print(table[["Compression Algorithm", "summary statistic", "RMSE", "p-value"]].to_latex(index=False))
+    table = build_table(list(autocorrelation_972_basic))
+    print(table[["Compression Algorithm", "summary statistic", "RMSE", "p-value"]].to_latex(index=False))

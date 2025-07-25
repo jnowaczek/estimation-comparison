@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:eb58fbc6fc58c27bfa510d8ee412f4dd6472b4b1e4dfa9749b7b8fc60d70d4aa"
+content_hash = "sha256:5dab3331f4e08a56983ee3dc775beb39dd9fe5e090beac257aa4bb0b826f1d7c"
 
 [[metadata.targets]]
 requires_python = ">=3.12"
@@ -928,6 +928,20 @@ files = [
 ]
 
 [[package]]
+name = "optype"
+version = "0.12.0"
+requires_python = ">=3.11"
+summary = "Building blocks for precise & flexible type hints"
+groups = ["dev"]
+dependencies = [
+    "typing-extensions>=4.10; python_version < \"3.13\"",
+]
+files = [
+    {file = "optype-0.12.0-py3-none-any.whl", hash = "sha256:245163b14cb78a83f4bf862d2278a5f9aef001242ac8ce577d1891dd1e0b104f"},
+    {file = "optype-0.12.0.tar.gz", hash = "sha256:d1314f486028bc8d53b8c3e6b65f493d999d983df11978272ff67c1876f8ce53"},
+]
+
+[[package]]
 name = "packaging"
 version = "24.1"
 requires_python = ">=3.8"
@@ -1333,6 +1347,20 @@ files = [
     {file = "scipy-1.15.2-cp313-cp313t-musllinux_1_2_x86_64.whl", hash = "sha256:f031846580d9acccd0044efd1a90e6f4df3a6e12b4b6bd694a7bc03a89892b28"},
     {file = "scipy-1.15.2-cp313-cp313t-win_amd64.whl", hash = "sha256:fe8a9eb875d430d81755472c5ba75e84acc980e4a8f6204d402849234d3017db"},
     {file = "scipy-1.15.2.tar.gz", hash = "sha256:cd58a314d92838f7e6f755c8a2167ead4f27e1fd5c1251fd54289569ef3495ec"},
+]
+
+[[package]]
+name = "scipy-stubs"
+version = "1.16.0.2"
+requires_python = ">=3.11"
+summary = "Type annotations for SciPy"
+groups = ["dev"]
+dependencies = [
+    "optype<1,>=0.10.0",
+]
+files = [
+    {file = "scipy_stubs-1.16.0.2-py3-none-any.whl", hash = "sha256:dc364d24a3accd1663e7576480bdb720533f94de8a05590354ff6d4a83d765c7"},
+    {file = "scipy_stubs-1.16.0.2.tar.gz", hash = "sha256:f83aacaf2e899d044de6483e6112bf7a1942d683304077bc9e78cf6f21353acd"},
 ]
 
 [[package]]
