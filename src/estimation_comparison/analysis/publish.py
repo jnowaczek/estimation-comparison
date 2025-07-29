@@ -204,8 +204,9 @@ def estimator_error_heatmap(df: pd.DataFrame, estimators: list[str], name: str, 
     grouped_p = grouped_p[grouped_p.index.isin(estimators)]
     return heatmap_helper(grouped, grouped_p, name, size, ylabels=ylabels)
 
+
 def sampled_error_heatmap(df: pd.DataFrame, preprocessors: list[str], name: str, size: tuple[float, float],
-                            ylabels=None):
+                          ylabels=None):
     grouped = df.pivot(index="preprocessor", columns="Compression Algorithm", values="RMSE")
     grouped = grouped[grouped.index.isin(preprocessors)]
     grouped_p = df.pivot(index="preprocessor", columns="Compression Algorithm", values="p-value")
@@ -319,29 +320,33 @@ if __name__ == "__main__":
     estimator_error_heatmap(bytecount_table, ["bytecount_file"], "basic/bytecount", (6, 3))
     estimator_error_heatmap(entropy_table, ["entropy_bits"], "basic/entropy", (6, 3))
 
-
     bytecount_linear = filter(
-        lambda c: (c[0] == "linear_random_25%" or c[0] == "linear_random_50%" or c[0] == "linear_random_75%") and c[1] == "bytecount_file", db.get_combinations())
+        lambda c: (c[0] == "linear_random_25%" or c[0] == "linear_random_50%" or c[0] == "linear_random_75%") and c[
+            1] == "bytecount_file", db.get_combinations())
 
     bytecount_linear_table = build_table(list(bytecount_linear))
-    sampled_error_heatmap(bytecount_linear_table, ["linear_random_25%", "linear_random_50%", "linear_random_75%"], "linear/bytecount", (6, 3))
+    sampled_error_heatmap(bytecount_linear_table, ["linear_random_25%", "linear_random_50%", "linear_random_75%"],
+                          "linear/bytecount", (6, 3))
 
     entropy_linear = filter(
-        lambda c: (c[0] == "linear_random_25%" or c[0] == "linear_random_50%" or c[0] == "linear_random_75%") and c[1] == "entropy_bytes", db.get_combinations())
+        lambda c: (c[0] == "linear_random_25%" or c[0] == "linear_random_50%" or c[0] == "linear_random_75%") and c[
+            1] == "entropy_bits", db.get_combinations())
 
     entropy_linear_table = build_table(list(entropy_linear))
-    sampled_error_heatmap(entropy_linear_table, ["linear_random_25%", "linear_random_50%", "linear_random_75%"], "linear/entropy", (6, 3))
-
-
+    sampled_error_heatmap(entropy_linear_table, ["linear_random_25%", "linear_random_50%", "linear_random_75%"],
+                          "linear/entropy", (6, 3))
 
     bytecount_patch = filter(
-        lambda c: (c[0] == "patch_random_25%" or c[0] == "patch_random_50%" or c[0] == "patch_random_75%") and c[1] == "bytecount_file", db.get_combinations())
+        lambda c: (c[0] == "patch_random_25%" or c[0] == "patch_random_50%" or c[0] == "patch_random_75%") and c[
+            1] == "bytecount_file", db.get_combinations())
     bytecount_patch_table = build_table(list(bytecount_patch))
-    sampled_error_heatmap(bytecount_linear_table, ["patch_random_25%", "patch_random_50%", "patch_random_75%"], "patch/bytecount", (6, 3))
+    sampled_error_heatmap(bytecount_patch_table, ["patch_random_25%", "patch_random_50%", "patch_random_75%"],
+                          "patch/bytecount", (6, 3))
 
     entropy_patch = filter(
-        lambda c: (c[0] == "patch_random_25%" or c[0] == "patch_random_50%" or c[0] == "patch_random_75%") and c[1] == "entropy_bytes", db.get_combinations())
+        lambda c: (c[0] == "patch_random_25%" or c[0] == "patch_random_50%" or c[0] == "patch_random_75%") and c[
+            1] == "entropy_bits", db.get_combinations())
 
     entropy_patch_table = build_table(list(entropy_patch))
-    sampled_error_heatmap(entropy_patch_table, ["patch_random_25%", "patch_random_50%", "linear_random_75%"], "patch/entropy", (6, 3))
-
+    sampled_error_heatmap(entropy_patch_table, ["patch_random_25%", "patch_random_50%", "patch_random_75%"],
+                          "patch/entropy", (6, 3))
