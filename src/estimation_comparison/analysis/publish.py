@@ -153,7 +153,7 @@ def autocorrelation_example():
     plt.show()
 
 
-def build_ac_table():
+def build_basic_ac_table():
     print("Autocorrelation 972 notch")
     autocorrelation_972_basic = filter(
         lambda c: c[0] == "entire_file" and c[1] == "autocorrelation_972",
@@ -161,8 +161,7 @@ def build_ac_table():
 
     table = build_table(list(autocorrelation_972_basic))
     table.to_csv("~/ac972.csv")
-    print(table[["Compression Algorithm", "summary statistic", "RMSE", "p-value"]].to_latex(index=False).replace("_",
-                                                                                                                 r"\_"))
+    return table
 
 
 def heatmap_helper(grouped, grouped_p, name, size, ylabels=None):
@@ -186,6 +185,7 @@ def heatmap_helper(grouped, grouped_p, name, size, ylabels=None):
     cbar.ax.set_yticks(np.arange(0, 15.01, 5))
     cbar.ax.set_ylabel("Model RMSE (Percent Size Reduction)")
     fig.savefig(f"plots/{name}.png")
+    plt.close(fig)
 
 
 def bsf_error_heatmap(df: pd.DataFrame, bsfs: list[str], name: str, size: tuple[float, float], ylabels=None):
@@ -215,138 +215,192 @@ def sampled_error_heatmap(df: pd.DataFrame, preprocessors: list[str], name: str,
 
 
 if __name__ == "__main__":
-    # print("Bytecount")
-    # bytecount_basic = filter(lambda c: c[0] == "entire_file" and c[1] == "bytecount_file", db.get_combinations())
-    #
-    # tables = build_table(list(bytecount_basic))
-    # for table in tables:
-    #     print(table[["Compression Algorithm", "RMSE", "p-value"]].to_latex(index=False))
-    #
-    # print("Entropy")
-    # entropy_basic = filter(lambda c: c[0] == "entire_file" and c[1] == "entropy_bits", db.get_combinations())
-    #
-    # tables = build_table(list(entropy_basic))
-    # for table in tables:
-    #     print(table[["Compression Algorithm", "RMSE", "p-value"]].to_latex(index=False))
-
-    # df = pd.read_csv("~/ac972.csv")
-    # # lag
-    # bsf_error_heatmap(df, ["lag_0", "lag_1", "lag_3"], "basic/lag", (6, 3), ylabels=["0", "1", "3"])
-    #
-    # # metric_cutoff
-    # bsf_error_heatmap(df, ["proportion_above_metric_cutoff_0.05",
-    #                        "proportion_above_metric_cutoff_0.1",
-    #                        "proportion_above_metric_cutoff_0.15",
-    #                        "proportion_above_metric_cutoff_0.2",
-    #                        "proportion_above_metric_cutoff_0.25",
-    #                        "proportion_above_metric_cutoff_0.3",
-    #                        "proportion_above_metric_cutoff_0.35",
-    #                        "proportion_above_metric_cutoff_0.4",
-    #                        "proportion_above_metric_cutoff_0.45",
-    #                        "proportion_above_metric_cutoff_0.5",
-    #                        "proportion_above_metric_cutoff_0.55",
-    #                        "proportion_above_metric_cutoff_0.6",
-    #                        "proportion_above_metric_cutoff_0.65",
-    #                        "proportion_above_metric_cutoff_0.7",
-    #                        "proportion_above_metric_cutoff_0.75",
-    #                        "proportion_above_metric_cutoff_0.8",
-    #                        "proportion_above_metric_cutoff_0.85",
-    #                        "proportion_above_metric_cutoff_0.9",
-    #                        "proportion_above_metric_cutoff_0.95"]
-    #                   , "metric_cutoff", (6, 7), ylabels=[f"{x * 0.05:.2f}" for x in range(1, 20)])
-    #
-    # # Mean inside
-    # bsf_error_heatmap(df, ["mean_inside_middle_notch_64",
-    #                        "mean_inside_middle_notch_128",
-    #                        "mean_inside_middle_notch_256",
-    #                        "mean_inside_middle_notch_512"], "basic/mean_inside", (6, 3), ylabels=["64", "128", "256", "512"])
-    #
-    # # Max outside
-    # bsf_error_heatmap(df, ["max_outside_middle_notch_64"], "basic/max_outside", (6, 3), ylabels=["64"])
-    #
-    # other_estimators = filter(
-    #     lambda c: c[0] == "entire_file" and (c[1] == "bytecount_file" or c[1] == "entropy_bits"), db.get_combinations())
-    #
-    # other_table = build_table(list(other_estimators))
-    # estimator_error_heatmap(other_table, ["bytecount_file", "entropy_bits"], "basic/entropy_bytecount", (6, 3))
-    # other_estimators = filter(
-    #     lambda c: c[0] == "entire_file" and (c[1] == "bytecount_file" or c[1] == "entropy_bits"), db.get_combinations())
-    #
-    #
-    # sampled_lag = build_table(list(other_estimators))
-    # bsf_error_heatmap(other_table, ["bytecount_file", "entropy_bits"], "basic/entropy_bytecount", (6, 3))
+    # autocorrelation_basic_df = build_basic_ac_table()
     #
     # # lag
-    # bsf_error_heatmap(df, ["lag_0", "lag_1", "lag_3"], "lag", (6, 3), ylabels=["0", "1", "3"])
+    # bsf_error_heatmap(autocorrelation_basic_df, ["lag_0", "lag_1", "lag_3"], "basic/lag", (6, 3),
+    #                   ylabels=["0", "1", "3"])
     #
     # # metric_cutoff
-    # bsf_error_heatmap(df, ["proportion_above_metric_cutoff_0.05",
-    #                        "proportion_above_metric_cutoff_0.1",
-    #                        "proportion_above_metric_cutoff_0.15",
-    #                        "proportion_above_metric_cutoff_0.2",
-    #                        "proportion_above_metric_cutoff_0.25",
-    #                        "proportion_above_metric_cutoff_0.3",
-    #                        "proportion_above_metric_cutoff_0.35",
-    #                        "proportion_above_metric_cutoff_0.4",
-    #                        "proportion_above_metric_cutoff_0.45",
-    #                        "proportion_above_metric_cutoff_0.5",
-    #                        "proportion_above_metric_cutoff_0.55",
-    #                        "proportion_above_metric_cutoff_0.6",
-    #                        "proportion_above_metric_cutoff_0.65",
-    #                        "proportion_above_metric_cutoff_0.7",
-    #                        "proportion_above_metric_cutoff_0.75",
-    #                        "proportion_above_metric_cutoff_0.8",
-    #                        "proportion_above_metric_cutoff_0.85",
-    #                        "proportion_above_metric_cutoff_0.9",
-    #                        "proportion_above_metric_cutoff_0.95"]
-    #                   , "metric_cutoff", (6, 7), ylabels=[f"{x * 0.05:.2f}" for x in range(1, 20)])
+    # bsf_error_heatmap(autocorrelation_basic_df, ["proportion_above_metric_cutoff_0.05",
+    #                                              "proportion_above_metric_cutoff_0.1",
+    #                                              "proportion_above_metric_cutoff_0.15",
+    #                                              "proportion_above_metric_cutoff_0.2",
+    #                                              "proportion_above_metric_cutoff_0.25",
+    #                                              "proportion_above_metric_cutoff_0.3",
+    #                                              "proportion_above_metric_cutoff_0.35",
+    #                                              "proportion_above_metric_cutoff_0.4",
+    #                                              "proportion_above_metric_cutoff_0.45",
+    #                                              "proportion_above_metric_cutoff_0.5",
+    #                                              "proportion_above_metric_cutoff_0.55",
+    #                                              "proportion_above_metric_cutoff_0.6",
+    #                                              "proportion_above_metric_cutoff_0.65",
+    #                                              "proportion_above_metric_cutoff_0.7",
+    #                                              "proportion_above_metric_cutoff_0.75",
+    #                                              "proportion_above_metric_cutoff_0.8",
+    #                                              "proportion_above_metric_cutoff_0.85",
+    #                                              "proportion_above_metric_cutoff_0.9",
+    #                                              "proportion_above_metric_cutoff_0.95"]
+    #                   , "basic/metric_cutoff", (6, 7), ylabels=[f"{x * 0.05:.2f}" for x in range(1, 20)])
     #
     # # Mean inside
-    # bsf_error_heatmap(df, ["mean_inside_middle_notch_64",
-    #                        "mean_inside_middle_notch_128",
-    #                        "mean_inside_middle_notch_256",
-    #                        "mean_inside_middle_notch_512"], "mean_inside", (6, 3), ylabels=["64", "128", "256", "512"])
+    # bsf_error_heatmap(autocorrelation_basic_df, ["mean_inside_middle_notch_64",
+    #                                              "mean_inside_middle_notch_128",
+    #                                              "mean_inside_middle_notch_256",
+    #                                              "mean_inside_middle_notch_512"], "basic/mean_inside", (6, 3),
+    #                   ylabels=["64", "128", "256", "512"])
     #
     # # Max outside
-    # bsf_error_heatmap(df, ["max_outside_middle_notch_64"], "max_outside", (6, 3), ylabels=["64"])
+    # bsf_error_heatmap(autocorrelation_basic_df, ["max_outside_middle_notch_64"], "basic/max_outside", (6, 3),
+    #                   ylabels=["64"])
 
-    bytecount = filter(
-        lambda c: c[0] == "entire_file" and c[1] == "bytecount_file", db.get_combinations())
-    entropy = filter(
-        lambda c: c[0] == "entire_file" and c[1] == "entropy_bits", db.get_combinations())
+    # autocorrelation_linear = filter(
+    #     lambda c: (c[0] == "linear_random_25%" or c[0] == "linear_random_50%" or c[0] == "linear_random_75%") and c[
+    #         1] == "autocorrelation_972",
+    #     db.get_combinations())
+    #
+    # autocorrelation_linear_table = build_table(list(autocorrelation_linear))
+    # autocorrelation_linear_table.to_csv("~/ac972_linear.csv")
+    #
+    # autocorrelation_patch = filter(
+    #     lambda c: (c[0] == "patch_random_25%" or c[0] == "patch_random_50%" or c[0] == "patch_random_75%") and c[
+    #         1] == "autocorrelation_972",
+    #     db.get_combinations())
+    #
+    # autocorrelation_patch_table = build_table(list(autocorrelation_patch))
+    # autocorrelation_patch_table.to_csv("~/ac972_patch.csv")
 
-    bytecount_table = build_table(list(bytecount))
-    entropy_table = build_table(list(entropy))
-    estimator_error_heatmap(bytecount_table, ["bytecount_file"], "basic/bytecount", (6, 3))
-    estimator_error_heatmap(entropy_table, ["entropy_bits"], "basic/entropy", (6, 3))
+    autocorrelation_linear_table = pd.read_csv("~/ac972_linear.csv")
+    autocorrelation_patch_table = pd.read_csv("~/ac972_patch.csv")
 
-    bytecount_linear = filter(
-        lambda c: (c[0] == "linear_random_25%" or c[0] == "linear_random_50%" or c[0] == "linear_random_75%") and c[
-            1] == "bytecount_file", db.get_combinations())
+    # lag
+    for x in ["25", "50", "75"]:
+        bsf_error_heatmap(
+            autocorrelation_linear_table[autocorrelation_linear_table["preprocessor"] == f"linear_random_{x}%"],
+            ["lag_0", "lag_1", "lag_3"], f"linear/lag_{x}", (6, 3),
+            ylabels=["0", "1", "3"])
 
-    bytecount_linear_table = build_table(list(bytecount_linear))
-    sampled_error_heatmap(bytecount_linear_table, ["linear_random_25%", "linear_random_50%", "linear_random_75%"],
-                          "linear/bytecount", (6, 3))
+        # metric_cutoff
+        bsf_error_heatmap(
+            autocorrelation_linear_table[autocorrelation_linear_table["preprocessor"] == f"linear_random_{x}%"],
+            ["proportion_above_metric_cutoff_0.05",
+             "proportion_above_metric_cutoff_0.1",
+             "proportion_above_metric_cutoff_0.15",
+             "proportion_above_metric_cutoff_0.2",
+             "proportion_above_metric_cutoff_0.25",
+             "proportion_above_metric_cutoff_0.3",
+             "proportion_above_metric_cutoff_0.35",
+             "proportion_above_metric_cutoff_0.4",
+             "proportion_above_metric_cutoff_0.45",
+             "proportion_above_metric_cutoff_0.5",
+             "proportion_above_metric_cutoff_0.55",
+             "proportion_above_metric_cutoff_0.6",
+             "proportion_above_metric_cutoff_0.65",
+             "proportion_above_metric_cutoff_0.7",
+             "proportion_above_metric_cutoff_0.75",
+             "proportion_above_metric_cutoff_0.8",
+             "proportion_above_metric_cutoff_0.85",
+             "proportion_above_metric_cutoff_0.9",
+             "proportion_above_metric_cutoff_0.95"]
+            , f"linear/metric_cutoff_{x}", (6, 7), ylabels=[f"{x * 0.05:.2f}" for x in range(1, 20)])
 
-    entropy_linear = filter(
-        lambda c: (c[0] == "linear_random_25%" or c[0] == "linear_random_50%" or c[0] == "linear_random_75%") and c[
-            1] == "entropy_bits", db.get_combinations())
+        # Mean inside
+        bsf_error_heatmap(
+            autocorrelation_linear_table[autocorrelation_linear_table["preprocessor"] == f"linear_random_{x}%"],
+            ["mean_inside_middle_notch_64",
+             "mean_inside_middle_notch_128",
+             "mean_inside_middle_notch_256",
+             "mean_inside_middle_notch_512"], f"linear/mean_inside_{x}", (6, 3),
+            ylabels=["64", "128", "256", "512"])
 
-    entropy_linear_table = build_table(list(entropy_linear))
-    sampled_error_heatmap(entropy_linear_table, ["linear_random_25%", "linear_random_50%", "linear_random_75%"],
-                          "linear/entropy", (6, 3))
+        # Max outside
+        bsf_error_heatmap(
+            autocorrelation_linear_table[autocorrelation_linear_table["preprocessor"] == f"linear_random_{x}%"],
+            ["max_outside_middle_notch_64"], f"linear/max_outside_{x}", (6, 3),
+            ylabels=["64"])
 
-    bytecount_patch = filter(
-        lambda c: (c[0] == "patch_random_25%" or c[0] == "patch_random_50%" or c[0] == "patch_random_75%") and c[
-            1] == "bytecount_file", db.get_combinations())
-    bytecount_patch_table = build_table(list(bytecount_patch))
-    sampled_error_heatmap(bytecount_patch_table, ["patch_random_25%", "patch_random_50%", "patch_random_75%"],
-                          "patch/bytecount", (6, 3))
+        # lag
+        bsf_error_heatmap(
+            autocorrelation_patch_table[autocorrelation_patch_table["preprocessor"] == f"patch_random_{x}%"],
+            ["lag_0", "lag_1", "lag_3"], f"patch/lag_{x}", (6, 3),
+            ylabels=["0", "1", "3"])
 
-    entropy_patch = filter(
-        lambda c: (c[0] == "patch_random_25%" or c[0] == "patch_random_50%" or c[0] == "patch_random_75%") and c[
-            1] == "entropy_bits", db.get_combinations())
+        # metric_cutoff
+        bsf_error_heatmap(
+            autocorrelation_patch_table[autocorrelation_patch_table["preprocessor"] == f"patch_random_{x}%"],
+            ["proportion_above_metric_cutoff_0.05",
+             "proportion_above_metric_cutoff_0.1",
+             "proportion_above_metric_cutoff_0.15",
+             "proportion_above_metric_cutoff_0.2",
+             "proportion_above_metric_cutoff_0.25",
+             "proportion_above_metric_cutoff_0.3",
+             "proportion_above_metric_cutoff_0.35",
+             "proportion_above_metric_cutoff_0.4",
+             "proportion_above_metric_cutoff_0.45",
+             "proportion_above_metric_cutoff_0.5",
+             "proportion_above_metric_cutoff_0.55",
+             "proportion_above_metric_cutoff_0.6",
+             "proportion_above_metric_cutoff_0.65",
+             "proportion_above_metric_cutoff_0.7",
+             "proportion_above_metric_cutoff_0.75",
+             "proportion_above_metric_cutoff_0.8",
+             "proportion_above_metric_cutoff_0.85",
+             "proportion_above_metric_cutoff_0.9",
+             "proportion_above_metric_cutoff_0.95"]
+            , f"patch/metric_cutoff_{x}", (6, 7), ylabels=[f"{x * 0.05:.2f}" for x in range(1, 20)])
 
-    entropy_patch_table = build_table(list(entropy_patch))
-    sampled_error_heatmap(entropy_patch_table, ["patch_random_25%", "patch_random_50%", "patch_random_75%"],
-                          "patch/entropy", (6, 3))
+        # Mean inside
+        bsf_error_heatmap(
+            autocorrelation_patch_table[autocorrelation_patch_table["preprocessor"] == f"patch_random_{x}%"],
+            ["mean_inside_middle_notch_64",
+             "mean_inside_middle_notch_128",
+             "mean_inside_middle_notch_256",
+             "mean_inside_middle_notch_512"], f"patch/mean_inside_{x}", (6, 3),
+            ylabels=["64", "128", "256", "512"])
+
+        # Max outside
+        bsf_error_heatmap(
+            autocorrelation_patch_table[autocorrelation_patch_table["preprocessor"] == f"patch_random_{x}%"],
+            ["max_outside_middle_notch_64"], f"patch/max_outside_{x}", (6, 3),
+            ylabels=["64"])
+
+    # bytecount = filter(
+    #     lambda c: c[0] == "entire_file" and c[1] == "bytecount_file", db.get_combinations())
+    # entropy = filter(
+    #     lambda c: c[0] == "entire_file" and c[1] == "entropy_bits", db.get_combinations())
+    #
+    # bytecount_table = build_table(list(bytecount))
+    # entropy_table = build_table(list(entropy))
+    # estimator_error_heatmap(bytecount_table, ["bytecount_file"], "basic/bytecount", (6, 3))
+    # estimator_error_heatmap(entropy_table, ["entropy_bits"], "basic/entropy", (6, 3))
+    #
+    # bytecount_linear = filter(
+    #     lambda c: (c[0] == "linear_random_25%" or c[0] == "linear_random_50%" or c[0] == "linear_random_75%") and c[
+    #         1] == "bytecount_file", db.get_combinations())
+    #
+    # bytecount_linear_table = build_table(list(bytecount_linear))
+    # sampled_error_heatmap(bytecount_linear_table, ["linear_random_25%", "linear_random_50%", "linear_random_75%"],
+    #                       "linear/bytecount", (6, 3))
+    #
+    # entropy_linear = filter(
+    #     lambda c: (c[0] == "linear_random_25%" or c[0] == "linear_random_50%" or c[0] == "linear_random_75%") and c[
+    #         1] == "entropy_bits", db.get_combinations())
+    #
+    # entropy_linear_table = build_table(list(entropy_linear))
+    # sampled_error_heatmap(entropy_linear_table, ["linear_random_25%", "linear_random_50%", "linear_random_75%"],
+    #                       "linear/entropy", (6, 3))
+    #
+    # bytecount_patch = filter(
+    #     lambda c: (c[0] == "patch_random_25%" or c[0] == "patch_random_50%" or c[0] == "patch_random_75%") and c[
+    #         1] == "bytecount_file", db.get_combinations())
+    # bytecount_patch_table = build_table(list(bytecount_patch))
+    # sampled_error_heatmap(bytecount_patch_table, ["patch_random_25%", "patch_random_50%", "patch_random_75%"],
+    #                       "patch/bytecount", (6, 3))
+    #
+    # entropy_patch = filter(
+    #     lambda c: (c[0] == "patch_random_25%" or c[0] == "patch_random_50%" or c[0] == "patch_random_75%") and c[
+    #         1] == "entropy_bits", db.get_combinations())
+    #
+    # entropy_patch_table = build_table(list(entropy_patch))
+    # sampled_error_heatmap(entropy_patch_table, ["patch_random_25%", "patch_random_50%", "patch_random_75%"],
+    #                       "patch/entropy", (6, 3))
