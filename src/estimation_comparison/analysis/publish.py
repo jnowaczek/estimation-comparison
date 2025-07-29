@@ -95,7 +95,7 @@ def render(graph: GraphSpec):
 
 def build_table(combinations: list[tuple[str, str, str]]):
     linear_results = pd.DataFrame(
-        columns=["Compression Algorithm", "NRMSE", "p-value", "estimator", "summary statistic"])
+        columns=["Compression Algorithm", "NRMSE", "p-value", "estimator", "summary statistic", "preprocessor"])
     # quad_results = pd.DataFrame(columns=["Compression Algorithm", "NRMSE", "p-value", "estimator", "summary statistic"])
 
     compressor_names = [c[1] for c in db.get_compressors()]
@@ -126,7 +126,7 @@ def build_table(combinations: list[tuple[str, str, str]]):
             #                                                     random_state=1337)
 
             linear_results.loc[len(linear_results)] = [compressor_name, linear_score, pvalue_linear, estimator_name,
-                                                       block_summary_func_name]
+                                                       block_summary_func_name, preprocessor_name]
             # quad_results.loc[len(linear_results)] = [compressor_name, quad_score, pvalue_quad, estimator_name,
             #                                          block_summary_func_name]
 
@@ -153,6 +153,66 @@ def autocorrelation_example():
     plt.show()
 
 
+def build_ac_table():
+    print("Autocorrelation 972 notch")
+    autocorrelation_972_basic = filter(
+        lambda c: c[0] == "entire_file" and c[1] == "autocorrelation_972",
+        db.get_combinations())
+
+    table = build_table(list(autocorrelation_972_basic))
+    table.to_csv("~/ac972.csv")
+    print(table[["Compression Algorithm", "summary statistic", "RMSE", "p-value"]].to_latex(index=False).replace("_",
+                                                                                                                 r"\_"))
+
+
+def heatmap_helper(grouped, grouped_p, name, size, ylabels=None):
+    fig, ax = plt.subplots(figsize=size, dpi=300, layout="constrained")
+    im = ax.imshow(grouped, cmap="Greys", vmin=0, vmax=15)
+    ax.set_xticks(range(len(grouped.columns)), grouped.columns, rotation=-30, ha="right", rotation_mode="anchor")
+    ax.set_yticks(range(len(grouped.index)), grouped.index if ylabels is None else ylabels)
+    ax.tick_params(top=True, bottom=False, labeltop=True, labelbottom=False)
+    ax.spines[:].set_color("white")
+    ax.set_xticks(np.arange(len(grouped.columns) + 1) - 0.5, minor=True)
+    ax.set_yticks(np.arange(len(grouped.index) + 1) - 0.5, minor=True)
+    ax.tick_params(which="both", bottom=False, left=False, top=False, right=False)
+    ax.grid(which="minor", color="w", linestyle='-', linewidth=2)
+    for i in range(len(grouped.columns)):
+        for j in range(len(grouped.index)):
+            pval = f"P={grouped_p.iloc[j, i]:.2f}" if grouped_p.iloc[j, i] > 0.01 else "P<0.01"
+            text = ax.text(i, j, f"{round(grouped.iloc[j, i], 2)}\n{pval}", ha="center", va="center",
+                           size="xx-small",
+                           color="black" if grouped.iloc[j, i] < 7.5 else "white")
+    cbar = ax.figure.colorbar(im, ax=ax, pad=0.01, )
+    cbar.ax.set_yticks(np.arange(0, 15.01, 5))
+    cbar.ax.set_ylabel("Model RMSE (Percent Size Reduction)")
+    fig.savefig(f"plots/{name}.png")
+
+
+def bsf_error_heatmap(df: pd.DataFrame, bsfs: list[str], name: str, size: tuple[float, float], ylabels=None):
+    grouped = df.pivot(index="summary statistic", columns="Compression Algorithm", values="RMSE")
+    grouped = grouped[grouped.index.isin(bsfs)]
+    grouped_p = df.pivot(index="summary statistic", columns="Compression Algorithm", values="p-value")
+    grouped_p = grouped_p[grouped_p.index.isin(bsfs)]
+    return heatmap_helper(grouped, grouped_p, name, size, ylabels=ylabels)
+
+
+def estimator_error_heatmap(df: pd.DataFrame, estimators: list[str], name: str, size: tuple[float, float],
+                            ylabels=None):
+    grouped = df.pivot(index="estimator", columns="Compression Algorithm", values="RMSE")
+    grouped = grouped[grouped.index.isin(estimators)]
+    grouped_p = df.pivot(index="estimator", columns="Compression Algorithm", values="p-value")
+    grouped_p = grouped_p[grouped_p.index.isin(estimators)]
+    return heatmap_helper(grouped, grouped_p, name, size, ylabels=ylabels)
+
+def sampled_error_heatmap(df: pd.DataFrame, preprocessors: list[str], name: str, size: tuple[float, float],
+                            ylabels=None):
+    grouped = df.pivot(index="preprocessor", columns="Compression Algorithm", values="RMSE")
+    grouped = grouped[grouped.index.isin(preprocessors)]
+    grouped_p = df.pivot(index="preprocessor", columns="Compression Algorithm", values="p-value")
+    grouped_p = grouped_p[grouped_p.index.isin(preprocessors)]
+    return heatmap_helper(grouped, grouped_p, name, size, ylabels=ylabels)
+
+
 if __name__ == "__main__":
     # print("Bytecount")
     # bytecount_basic = filter(lambda c: c[0] == "entire_file" and c[1] == "bytecount_file", db.get_combinations())
@@ -168,10 +228,120 @@ if __name__ == "__main__":
     # for table in tables:
     #     print(table[["Compression Algorithm", "RMSE", "p-value"]].to_latex(index=False))
 
-    print("Autocorrelation 972 notch")
-    autocorrelation_972_basic = filter(
-        lambda c: c[0] == "entire_file" and c[1] == "autocorrelation_972" and c[2] == "mean_inside_middle_notch_512",
-        db.get_combinations())
+    # df = pd.read_csv("~/ac972.csv")
+    # # lag
+    # bsf_error_heatmap(df, ["lag_0", "lag_1", "lag_3"], "basic/lag", (6, 3), ylabels=["0", "1", "3"])
+    #
+    # # metric_cutoff
+    # bsf_error_heatmap(df, ["proportion_above_metric_cutoff_0.05",
+    #                        "proportion_above_metric_cutoff_0.1",
+    #                        "proportion_above_metric_cutoff_0.15",
+    #                        "proportion_above_metric_cutoff_0.2",
+    #                        "proportion_above_metric_cutoff_0.25",
+    #                        "proportion_above_metric_cutoff_0.3",
+    #                        "proportion_above_metric_cutoff_0.35",
+    #                        "proportion_above_metric_cutoff_0.4",
+    #                        "proportion_above_metric_cutoff_0.45",
+    #                        "proportion_above_metric_cutoff_0.5",
+    #                        "proportion_above_metric_cutoff_0.55",
+    #                        "proportion_above_metric_cutoff_0.6",
+    #                        "proportion_above_metric_cutoff_0.65",
+    #                        "proportion_above_metric_cutoff_0.7",
+    #                        "proportion_above_metric_cutoff_0.75",
+    #                        "proportion_above_metric_cutoff_0.8",
+    #                        "proportion_above_metric_cutoff_0.85",
+    #                        "proportion_above_metric_cutoff_0.9",
+    #                        "proportion_above_metric_cutoff_0.95"]
+    #                   , "metric_cutoff", (6, 7), ylabels=[f"{x * 0.05:.2f}" for x in range(1, 20)])
+    #
+    # # Mean inside
+    # bsf_error_heatmap(df, ["mean_inside_middle_notch_64",
+    #                        "mean_inside_middle_notch_128",
+    #                        "mean_inside_middle_notch_256",
+    #                        "mean_inside_middle_notch_512"], "basic/mean_inside", (6, 3), ylabels=["64", "128", "256", "512"])
+    #
+    # # Max outside
+    # bsf_error_heatmap(df, ["max_outside_middle_notch_64"], "basic/max_outside", (6, 3), ylabels=["64"])
+    #
+    # other_estimators = filter(
+    #     lambda c: c[0] == "entire_file" and (c[1] == "bytecount_file" or c[1] == "entropy_bits"), db.get_combinations())
+    #
+    # other_table = build_table(list(other_estimators))
+    # estimator_error_heatmap(other_table, ["bytecount_file", "entropy_bits"], "basic/entropy_bytecount", (6, 3))
+    # other_estimators = filter(
+    #     lambda c: c[0] == "entire_file" and (c[1] == "bytecount_file" or c[1] == "entropy_bits"), db.get_combinations())
+    #
+    #
+    # sampled_lag = build_table(list(other_estimators))
+    # bsf_error_heatmap(other_table, ["bytecount_file", "entropy_bits"], "basic/entropy_bytecount", (6, 3))
+    #
+    # # lag
+    # bsf_error_heatmap(df, ["lag_0", "lag_1", "lag_3"], "lag", (6, 3), ylabels=["0", "1", "3"])
+    #
+    # # metric_cutoff
+    # bsf_error_heatmap(df, ["proportion_above_metric_cutoff_0.05",
+    #                        "proportion_above_metric_cutoff_0.1",
+    #                        "proportion_above_metric_cutoff_0.15",
+    #                        "proportion_above_metric_cutoff_0.2",
+    #                        "proportion_above_metric_cutoff_0.25",
+    #                        "proportion_above_metric_cutoff_0.3",
+    #                        "proportion_above_metric_cutoff_0.35",
+    #                        "proportion_above_metric_cutoff_0.4",
+    #                        "proportion_above_metric_cutoff_0.45",
+    #                        "proportion_above_metric_cutoff_0.5",
+    #                        "proportion_above_metric_cutoff_0.55",
+    #                        "proportion_above_metric_cutoff_0.6",
+    #                        "proportion_above_metric_cutoff_0.65",
+    #                        "proportion_above_metric_cutoff_0.7",
+    #                        "proportion_above_metric_cutoff_0.75",
+    #                        "proportion_above_metric_cutoff_0.8",
+    #                        "proportion_above_metric_cutoff_0.85",
+    #                        "proportion_above_metric_cutoff_0.9",
+    #                        "proportion_above_metric_cutoff_0.95"]
+    #                   , "metric_cutoff", (6, 7), ylabels=[f"{x * 0.05:.2f}" for x in range(1, 20)])
+    #
+    # # Mean inside
+    # bsf_error_heatmap(df, ["mean_inside_middle_notch_64",
+    #                        "mean_inside_middle_notch_128",
+    #                        "mean_inside_middle_notch_256",
+    #                        "mean_inside_middle_notch_512"], "mean_inside", (6, 3), ylabels=["64", "128", "256", "512"])
+    #
+    # # Max outside
+    # bsf_error_heatmap(df, ["max_outside_middle_notch_64"], "max_outside", (6, 3), ylabels=["64"])
 
-    table = build_table(list(autocorrelation_972_basic))
-    print(table[["Compression Algorithm", "summary statistic", "RMSE", "p-value"]].to_latex(index=False))
+    bytecount = filter(
+        lambda c: c[0] == "entire_file" and c[1] == "bytecount_file", db.get_combinations())
+    entropy = filter(
+        lambda c: c[0] == "entire_file" and c[1] == "entropy_bits", db.get_combinations())
+
+    bytecount_table = build_table(list(bytecount))
+    entropy_table = build_table(list(entropy))
+    estimator_error_heatmap(bytecount_table, ["bytecount_file"], "basic/bytecount", (6, 3))
+    estimator_error_heatmap(entropy_table, ["entropy_bits"], "basic/entropy", (6, 3))
+
+
+    bytecount_linear = filter(
+        lambda c: (c[0] == "linear_random_25%" or c[0] == "linear_random_50%" or c[0] == "linear_random_75%") and c[1] == "bytecount_file", db.get_combinations())
+
+    bytecount_linear_table = build_table(list(bytecount_linear))
+    sampled_error_heatmap(bytecount_linear_table, ["linear_random_25%", "linear_random_50%", "linear_random_75%"], "linear/bytecount", (6, 3))
+
+    entropy_linear = filter(
+        lambda c: (c[0] == "linear_random_25%" or c[0] == "linear_random_50%" or c[0] == "linear_random_75%") and c[1] == "entropy_bytes", db.get_combinations())
+
+    entropy_linear_table = build_table(list(entropy_linear))
+    sampled_error_heatmap(entropy_linear_table, ["linear_random_25%", "linear_random_50%", "linear_random_75%"], "linear/entropy", (6, 3))
+
+
+
+    bytecount_patch = filter(
+        lambda c: (c[0] == "patch_random_25%" or c[0] == "patch_random_50%" or c[0] == "patch_random_75%") and c[1] == "bytecount_file", db.get_combinations())
+    bytecount_patch_table = build_table(list(bytecount_patch))
+    sampled_error_heatmap(bytecount_linear_table, ["patch_random_25%", "patch_random_50%", "patch_random_75%"], "patch/bytecount", (6, 3))
+
+    entropy_patch = filter(
+        lambda c: (c[0] == "patch_random_25%" or c[0] == "patch_random_50%" or c[0] == "patch_random_75%") and c[1] == "entropy_bytes", db.get_combinations())
+
+    entropy_patch_table = build_table(list(entropy_patch))
+    sampled_error_heatmap(entropy_patch_table, ["patch_random_25%", "patch_random_50%", "linear_random_75%"], "patch/entropy", (6, 3))
+
