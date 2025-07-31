@@ -30,6 +30,7 @@ from estimation_comparison.data_collection.compressor.general import *
 from estimation_comparison.data_collection.compressor.image import *
 from estimation_comparison.data_collection.compressor.image.webp import WebPCompressor
 from estimation_comparison.data_collection.estimator import *
+from estimation_comparison.data_collection.estimator.byte_count_gte import ByteCountGte
 from estimation_comparison.data_collection.preprocessor import FlattenSampler, PatchSampler
 from estimation_comparison.data_collection.preprocessor.linear_sample import LinearSampler
 from estimation_comparison.data_collection.summary_stats import max_outside_middle_notch, autocorrelation_lag, \
@@ -121,7 +122,7 @@ class Benchmark:
                 summarize_block=True,
                 summarize_file=True
             ),
-            # Estimator(name="bytecount_file", instance=ByteCount()),
+            Estimator(name="bytecount_file_gte", instance=ByteCountGte()),
             # Estimator(name="entropy_bits", instance=Entropy()),
         ]
 

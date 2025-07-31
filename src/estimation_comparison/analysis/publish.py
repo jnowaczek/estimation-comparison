@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
+import matplotlib
 import numpy as np
 import pandas as pd
 import sklearn
@@ -164,95 +165,108 @@ def build_basic_ac_table():
     return table
 
 
-def heatmap_helper(grouped, grouped_p, name, size, ylabels=None):
+def heatmap_helper(grouped, grouped_p, name, size, ylabels=None, yaxis=None):
     fig, ax = plt.subplots(figsize=size, dpi=300, layout="constrained")
     im = ax.imshow(grouped, cmap="Greys", vmin=0, vmax=15)
     ax.set_xticks(range(len(grouped.columns)), grouped.columns, rotation=-30, ha="right", rotation_mode="anchor")
     ax.set_yticks(range(len(grouped.index)), grouped.index if ylabels is None else ylabels)
-    ax.tick_params(top=True, bottom=False, labeltop=True, labelbottom=False)
+    if yaxis is not None:
+        ax.set_ylabel(yaxis)
+    ax.tick_params(top=True, bottom=False, left=True, right=False, labeltop=True, labelbottom=False)
     ax.spines[:].set_color("white")
     ax.set_xticks(np.arange(len(grouped.columns) + 1) - 0.5, minor=True)
     ax.set_yticks(np.arange(len(grouped.index) + 1) - 0.5, minor=True)
-    ax.tick_params(which="both", bottom=False, left=False, top=False, right=False)
+    ax.tick_params(which="minor", bottom=False, left=False, top=False, right=False)
     ax.grid(which="minor", color="w", linestyle='-', linewidth=2)
     for i in range(len(grouped.columns)):
         for j in range(len(grouped.index)):
-            pval = f"P={grouped_p.iloc[j, i]:.2f}" if grouped_p.iloc[j, i] > 0.01 else "P<0.01"
+            pval = f"P={grouped_p.iloc[j, i]:.2f}" if grouped_p.iloc[j, i] > 0.01 else "*"
             text = ax.text(i, j, f"{round(grouped.iloc[j, i], 2)}\n{pval}", ha="center", va="center",
                            size="xx-small",
                            color="black" if grouped.iloc[j, i] < 7.5 else "white")
-    cbar = ax.figure.colorbar(im, ax=ax, pad=0.01, )
-    cbar.ax.set_yticks(np.arange(0, 15.01, 5))
-    cbar.ax.set_ylabel("Model RMSE (Percent Size Reduction)")
     fig.savefig(f"plots/{name}.png")
     plt.close(fig)
 
 
-def bsf_error_heatmap(df: pd.DataFrame, bsfs: list[str], name: str, size: tuple[float, float], ylabels=None):
+def heatmap_colorbar():
+    fig, ax = plt.subplots(figsize=(6, 1), dpi=300, layout="constrained")
+    cmap = matplotlib.colormaps["Greys"]
+    norm = matplotlib.colors.Normalize(vmin=0, vmax=15)
+    fig.colorbar(matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap), cax=ax, orientation="horizontal",
+                 label="Model RMSE (Percent Size Reduction)")
+    ax.set_xticks(np.arange(0, 15.01, 5))
+    fig.savefig("plots/heatmap_colorbar.png")
+
+
+def bsf_error_heatmap(df: pd.DataFrame, bsfs: list[str], name: str, size: tuple[float, float], ylabels=None,
+                      yaxis=None):
     grouped = df.pivot(index="summary statistic", columns="Compression Algorithm", values="RMSE")
     grouped = grouped[grouped.index.isin(bsfs)]
     grouped_p = df.pivot(index="summary statistic", columns="Compression Algorithm", values="p-value")
     grouped_p = grouped_p[grouped_p.index.isin(bsfs)]
-    return heatmap_helper(grouped, grouped_p, name, size, ylabels=ylabels)
+    return heatmap_helper(grouped, grouped_p, name, size, ylabels, yaxis)
 
 
 def estimator_error_heatmap(df: pd.DataFrame, estimators: list[str], name: str, size: tuple[float, float],
-                            ylabels=None):
+                            ylabels=None, yaxis=None):
     grouped = df.pivot(index="estimator", columns="Compression Algorithm", values="RMSE")
     grouped = grouped[grouped.index.isin(estimators)]
     grouped_p = df.pivot(index="estimator", columns="Compression Algorithm", values="p-value")
     grouped_p = grouped_p[grouped_p.index.isin(estimators)]
-    return heatmap_helper(grouped, grouped_p, name, size, ylabels=ylabels)
+    return heatmap_helper(grouped, grouped_p, name, size, ylabels=ylabels, yaxis=yaxis)
 
 
 def sampled_error_heatmap(df: pd.DataFrame, preprocessors: list[str], name: str, size: tuple[float, float],
-                          ylabels=None):
+                          ylabels=None, yaxis=None):
     grouped = df.pivot(index="preprocessor", columns="Compression Algorithm", values="RMSE")
     grouped = grouped[grouped.index.isin(preprocessors)]
     grouped_p = df.pivot(index="preprocessor", columns="Compression Algorithm", values="p-value")
     grouped_p = grouped_p[grouped_p.index.isin(preprocessors)]
-    return heatmap_helper(grouped, grouped_p, name, size, ylabels=ylabels)
+    return heatmap_helper(grouped, grouped_p, name, size, ylabels=ylabels, yaxis=yaxis)
 
 
 if __name__ == "__main__":
+    heatmap_colorbar()
+
     # autocorrelation_basic_df = build_basic_ac_table()
-    #
-    # # lag
-    # bsf_error_heatmap(autocorrelation_basic_df, ["lag_0", "lag_1", "lag_3"], "basic/lag", (6, 3),
-    #                   ylabels=["0", "1", "3"])
-    #
-    # # metric_cutoff
-    # bsf_error_heatmap(autocorrelation_basic_df, ["proportion_above_metric_cutoff_0.05",
-    #                                              "proportion_above_metric_cutoff_0.1",
-    #                                              "proportion_above_metric_cutoff_0.15",
-    #                                              "proportion_above_metric_cutoff_0.2",
-    #                                              "proportion_above_metric_cutoff_0.25",
-    #                                              "proportion_above_metric_cutoff_0.3",
-    #                                              "proportion_above_metric_cutoff_0.35",
-    #                                              "proportion_above_metric_cutoff_0.4",
-    #                                              "proportion_above_metric_cutoff_0.45",
-    #                                              "proportion_above_metric_cutoff_0.5",
-    #                                              "proportion_above_metric_cutoff_0.55",
-    #                                              "proportion_above_metric_cutoff_0.6",
-    #                                              "proportion_above_metric_cutoff_0.65",
-    #                                              "proportion_above_metric_cutoff_0.7",
-    #                                              "proportion_above_metric_cutoff_0.75",
-    #                                              "proportion_above_metric_cutoff_0.8",
-    #                                              "proportion_above_metric_cutoff_0.85",
-    #                                              "proportion_above_metric_cutoff_0.9",
-    #                                              "proportion_above_metric_cutoff_0.95"]
-    #                   , "basic/metric_cutoff", (6, 7), ylabels=[f"{x * 0.05:.2f}" for x in range(1, 20)])
-    #
-    # # Mean inside
-    # bsf_error_heatmap(autocorrelation_basic_df, ["mean_inside_middle_notch_64",
-    #                                              "mean_inside_middle_notch_128",
-    #                                              "mean_inside_middle_notch_256",
-    #                                              "mean_inside_middle_notch_512"], "basic/mean_inside", (6, 3),
-    #                   ylabels=["64", "128", "256", "512"])
-    #
-    # # Max outside
-    # bsf_error_heatmap(autocorrelation_basic_df, ["max_outside_middle_notch_64"], "basic/max_outside", (6, 3),
-    #                   ylabels=["64"])
+    autocorrelation_basic_df = pd.read_csv("~/ac972.csv")
+    # lag
+    bsf_error_heatmap(autocorrelation_basic_df, ["lag_0", "lag_1", "lag_3"], "basic/lag", (6, 3),
+                      ylabels=["0", "1", "3"], yaxis="lag")
+
+    # metric_cutoff
+    bsf_error_heatmap(autocorrelation_basic_df, ["proportion_above_metric_cutoff_0.05",
+                                                 "proportion_above_metric_cutoff_0.1",
+                                                 "proportion_above_metric_cutoff_0.15",
+                                                 "proportion_above_metric_cutoff_0.2",
+                                                 "proportion_above_metric_cutoff_0.25",
+                                                 "proportion_above_metric_cutoff_0.3",
+                                                 "proportion_above_metric_cutoff_0.35",
+                                                 "proportion_above_metric_cutoff_0.4",
+                                                 "proportion_above_metric_cutoff_0.45",
+                                                 "proportion_above_metric_cutoff_0.5",
+                                                 "proportion_above_metric_cutoff_0.55",
+                                                 "proportion_above_metric_cutoff_0.6",
+                                                 "proportion_above_metric_cutoff_0.65",
+                                                 "proportion_above_metric_cutoff_0.7",
+                                                 "proportion_above_metric_cutoff_0.75",
+                                                 "proportion_above_metric_cutoff_0.8",
+                                                 "proportion_above_metric_cutoff_0.85",
+                                                 "proportion_above_metric_cutoff_0.9",
+                                                 "proportion_above_metric_cutoff_0.95"]
+                      , "basic/metric_cutoff", (6, 7), ylabels=[f"{x * 0.05:g}" for x in range(1, 20)],
+                      yaxis="proportion_above_metric_cutoff")
+
+    # Mean inside
+    bsf_error_heatmap(autocorrelation_basic_df, ["mean_inside_middle_notch_64",
+                                                 "mean_inside_middle_notch_128",
+                                                 "mean_inside_middle_notch_256",
+                                                 "mean_inside_middle_notch_512"], "basic/mean_inside", (6, 3),
+                      ylabels=["64", "128", "256", "512"], yaxis="mean_inside_middle_notch")
+
+    # Max outside
+    bsf_error_heatmap(autocorrelation_basic_df, ["max_outside_middle_notch_64"], "basic/max_outside", (6, 3),
+                      ylabels=["64"], yaxis="max_outside_middle_notch")
 
     # autocorrelation_linear = filter(
     #     lambda c: (c[0] == "linear_random_25%" or c[0] == "linear_random_50%" or c[0] == "linear_random_75%") and c[
@@ -278,7 +292,7 @@ if __name__ == "__main__":
         bsf_error_heatmap(
             autocorrelation_linear_table[autocorrelation_linear_table["preprocessor"] == f"linear_random_{x}%"],
             ["lag_0", "lag_1", "lag_3"], f"linear/lag_{x}", (6, 3),
-            ylabels=["0", "1", "3"])
+            ylabels=["0", "1", "3"], yaxis=f"lag")
 
         # metric_cutoff
         bsf_error_heatmap(
@@ -302,7 +316,8 @@ if __name__ == "__main__":
              "proportion_above_metric_cutoff_0.85",
              "proportion_above_metric_cutoff_0.9",
              "proportion_above_metric_cutoff_0.95"]
-            , f"linear/metric_cutoff_{x}", (6, 7), ylabels=[f"{x * 0.05:.2f}" for x in range(1, 20)])
+            , f"linear/metric_cutoff_{x}", (6, 7), ylabels=[f"{x * 0.05:g}" for x in range(1, 20)],
+            yaxis="proportion_above_metric_cutoff")
 
         # Mean inside
         bsf_error_heatmap(
@@ -311,19 +326,19 @@ if __name__ == "__main__":
              "mean_inside_middle_notch_128",
              "mean_inside_middle_notch_256",
              "mean_inside_middle_notch_512"], f"linear/mean_inside_{x}", (6, 3),
-            ylabels=["64", "128", "256", "512"])
+            ylabels=["64", "128", "256", "512"], yaxis="mean_inside_middle_notch_notch")
 
         # Max outside
         bsf_error_heatmap(
             autocorrelation_linear_table[autocorrelation_linear_table["preprocessor"] == f"linear_random_{x}%"],
             ["max_outside_middle_notch_64"], f"linear/max_outside_{x}", (6, 3),
-            ylabels=["64"])
+            ylabels=["64"], yaxis="max_outside_middle_notch_notch")
 
         # lag
         bsf_error_heatmap(
             autocorrelation_patch_table[autocorrelation_patch_table["preprocessor"] == f"patch_random_{x}%"],
             ["lag_0", "lag_1", "lag_3"], f"patch/lag_{x}", (6, 3),
-            ylabels=["0", "1", "3"])
+            ylabels=["0", "1", "3"], yaxis="lag")
 
         # metric_cutoff
         bsf_error_heatmap(
@@ -347,7 +362,8 @@ if __name__ == "__main__":
              "proportion_above_metric_cutoff_0.85",
              "proportion_above_metric_cutoff_0.9",
              "proportion_above_metric_cutoff_0.95"]
-            , f"patch/metric_cutoff_{x}", (6, 7), ylabels=[f"{x * 0.05:.2f}" for x in range(1, 20)])
+            , f"patch/metric_cutoff_{x}", (6, 7), ylabels=[f"{x * 0.05:g}" for x in range(1, 20)],
+            yaxis="proportion_above_metric_cutoff")
 
         # Mean inside
         bsf_error_heatmap(
@@ -356,51 +372,51 @@ if __name__ == "__main__":
              "mean_inside_middle_notch_128",
              "mean_inside_middle_notch_256",
              "mean_inside_middle_notch_512"], f"patch/mean_inside_{x}", (6, 3),
-            ylabels=["64", "128", "256", "512"])
+            ylabels=["64", "128", "256", "512"], yaxis="mean_inside_middle_notch")
 
         # Max outside
         bsf_error_heatmap(
             autocorrelation_patch_table[autocorrelation_patch_table["preprocessor"] == f"patch_random_{x}%"],
             ["max_outside_middle_notch_64"], f"patch/max_outside_{x}", (6, 3),
-            ylabels=["64"])
+            ylabels=["64"], yaxis="max_outside_middle_notch")
 
-    # bytecount = filter(
-    #     lambda c: c[0] == "entire_file" and c[1] == "bytecount_file", db.get_combinations())
-    # entropy = filter(
-    #     lambda c: c[0] == "entire_file" and c[1] == "entropy_bits", db.get_combinations())
-    #
-    # bytecount_table = build_table(list(bytecount))
-    # entropy_table = build_table(list(entropy))
-    # estimator_error_heatmap(bytecount_table, ["bytecount_file"], "basic/bytecount", (6, 3))
-    # estimator_error_heatmap(entropy_table, ["entropy_bits"], "basic/entropy", (6, 3))
-    #
-    # bytecount_linear = filter(
-    #     lambda c: (c[0] == "linear_random_25%" or c[0] == "linear_random_50%" or c[0] == "linear_random_75%") and c[
-    #         1] == "bytecount_file", db.get_combinations())
-    #
-    # bytecount_linear_table = build_table(list(bytecount_linear))
-    # sampled_error_heatmap(bytecount_linear_table, ["linear_random_25%", "linear_random_50%", "linear_random_75%"],
-    #                       "linear/bytecount", (6, 3))
-    #
-    # entropy_linear = filter(
-    #     lambda c: (c[0] == "linear_random_25%" or c[0] == "linear_random_50%" or c[0] == "linear_random_75%") and c[
-    #         1] == "entropy_bits", db.get_combinations())
-    #
-    # entropy_linear_table = build_table(list(entropy_linear))
-    # sampled_error_heatmap(entropy_linear_table, ["linear_random_25%", "linear_random_50%", "linear_random_75%"],
-    #                       "linear/entropy", (6, 3))
-    #
-    # bytecount_patch = filter(
-    #     lambda c: (c[0] == "patch_random_25%" or c[0] == "patch_random_50%" or c[0] == "patch_random_75%") and c[
-    #         1] == "bytecount_file", db.get_combinations())
-    # bytecount_patch_table = build_table(list(bytecount_patch))
-    # sampled_error_heatmap(bytecount_patch_table, ["patch_random_25%", "patch_random_50%", "patch_random_75%"],
-    #                       "patch/bytecount", (6, 3))
-    #
-    # entropy_patch = filter(
-    #     lambda c: (c[0] == "patch_random_25%" or c[0] == "patch_random_50%" or c[0] == "patch_random_75%") and c[
-    #         1] == "entropy_bits", db.get_combinations())
-    #
-    # entropy_patch_table = build_table(list(entropy_patch))
-    # sampled_error_heatmap(entropy_patch_table, ["patch_random_25%", "patch_random_50%", "patch_random_75%"],
-    #                       "patch/entropy", (6, 3))
+    bytecount = filter(
+        lambda c: c[0] == "entire_file" and c[1] == "bytecount_file", db.get_combinations())
+    entropy = filter(
+        lambda c: c[0] == "entire_file" and c[1] == "entropy_bits", db.get_combinations())
+
+    bytecount_table = build_table(list(bytecount))
+    entropy_table = build_table(list(entropy))
+    estimator_error_heatmap(bytecount_table, ["bytecount_file"], "basic/bytecount", (6, 3))
+    estimator_error_heatmap(entropy_table, ["entropy_bits"], "basic/entropy", (6, 3))
+
+    bytecount_linear = filter(
+        lambda c: (c[0] == "linear_random_25%" or c[0] == "linear_random_50%" or c[0] == "linear_random_75%") and c[
+            1] == "bytecount_file", db.get_combinations())
+
+    bytecount_linear_table = build_table(list(bytecount_linear))
+    sampled_error_heatmap(bytecount_linear_table, ["linear_random_25%", "linear_random_50%", "linear_random_75%"],
+                          "linear/bytecount", (6, 3), ylabels=["25%", "50%", "75%"], yaxis="linear_random")
+
+    entropy_linear = filter(
+        lambda c: (c[0] == "linear_random_25%" or c[0] == "linear_random_50%" or c[0] == "linear_random_75%") and c[
+            1] == "entropy_bits", db.get_combinations())
+
+    entropy_linear_table = build_table(list(entropy_linear))
+    sampled_error_heatmap(entropy_linear_table, ["linear_random_25%", "linear_random_50%", "linear_random_75%"],
+                          "linear/entropy", (6, 3), ylabels=["25%", "50%", "75%"], yaxis="linear_random")
+
+    bytecount_patch = filter(
+        lambda c: (c[0] == "patch_random_25%" or c[0] == "patch_random_50%" or c[0] == "patch_random_75%") and c[
+            1] == "bytecount_file", db.get_combinations())
+    bytecount_patch_table = build_table(list(bytecount_patch))
+    sampled_error_heatmap(bytecount_patch_table, ["patch_random_25%", "patch_random_50%", "patch_random_75%"],
+                          "patch/bytecount", (6, 3), ylabels=["25%", "50%", "75%"], yaxis="patch_random")
+
+    entropy_patch = filter(
+        lambda c: (c[0] == "patch_random_25%" or c[0] == "patch_random_50%" or c[0] == "patch_random_75%") and c[
+            1] == "entropy_bits", db.get_combinations())
+
+    entropy_patch_table = build_table(list(entropy_patch))
+    sampled_error_heatmap(entropy_patch_table, ["patch_random_25%", "patch_random_50%", "patch_random_75%"],
+                          "patch/entropy", (6, 3), ylabels=["25%", "50%", "75%"], yaxis="patch_random")

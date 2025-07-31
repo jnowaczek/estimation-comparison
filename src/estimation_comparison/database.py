@@ -504,8 +504,8 @@ class BenchmarkDatabase:
                         ?)
                 """,
                 (result.input_file.hash, result.preprocessor.name, result.estimator.name,
-                 result.block_summary_func.name if result.block_summary_func else None,
-                 result.file_summary_func.name if result.file_summary_func else None,
+                 result.block_summary_func.name if result.block_summary_func else "none",
+                 result.file_summary_func.name if result.file_summary_func else "none",
                  result.value[0] if isinstance(result.value, list) and len(result.value) == 1 else result.value)
             )
             self.con.commit()
